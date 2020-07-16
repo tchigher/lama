@@ -1,7 +1,6 @@
 package co.ledger.lama.api.repository
 
 import co.ledger.lama.api.model.{User, UserName}
-import co.ledger.template.model.{User, UserName}
 
 object algebra {
 

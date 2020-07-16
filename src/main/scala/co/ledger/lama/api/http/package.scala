@@ -1,6 +1,6 @@
 package co.ledger.lama.api
 
-import co.ledger.template.model._
+import co.ledger.lama.api.model._
 import io.circe.{Encoder, Json}
 
 package object http {

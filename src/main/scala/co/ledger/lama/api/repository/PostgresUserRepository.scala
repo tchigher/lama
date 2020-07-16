@@ -4,9 +4,7 @@ import cats.effect.Async
 import cats.syntax.applicativeError._
 import cats.syntax.functor._
 import co.ledger.lama.api.model.{User, UserName}
-import co.ledger.template.model
-import co.ledger.template.model._
-import co.ledger.template.repository.algebra.UserRepository
+import co.ledger.lama.api.repository.algebra.UserRepository
 import doobie.free.connection.ConnectionIO
 import doobie.implicits._
 import doobie.util.invariant.UnexpectedEnd

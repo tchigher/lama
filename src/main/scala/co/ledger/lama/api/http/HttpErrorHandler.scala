@@ -1,8 +1,7 @@
 package co.ledger.lama.api.http
 
 import cats.Monad
-import co.ledger.lama.api.model.ApiError
-import co.ledger.template.model.{ApiError, OtherError, UserAlreadyExist, UserNotFound}
+import co.ledger.lama.api.model._
 import org.http4s.Response
 import org.http4s.dsl.Http4sDsl
 

@@ -3,9 +3,9 @@ package co.ledger.lama.api.service
 import cats.data.EitherT
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
-import co.ledger.template.IOAssertion
-import co.ledger.template.TestUsers._
-import co.ledger.template.model.{UserName, UserNotFound}
+import co.ledger.lama.api.IOAssertion
+import co.ledger.lama.api.TestUsers._
+import co.ledger.lama.api.model.{UserName, UserNotFound}
 
 class UserServiceSpec extends AnyFlatSpecLike with Matchers {
 

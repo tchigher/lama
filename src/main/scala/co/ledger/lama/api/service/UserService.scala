@@ -4,9 +4,8 @@ import cats.data.EitherT
 import cats.effect.Async
 import cats.syntax.applicativeError._
 import cats.syntax.functor._
-import co.ledger.lama.api.model.{ApiError, User, UserName}
-import co.ledger.template.model._
-import co.ledger.template.repository.algebra.UserRepository
+import co.ledger.lama.api.model._
+import co.ledger.lama.api.repository.algebra.UserRepository
 
 class UserService[F[_]: Async](userRepo: UserRepository[F]) {
 

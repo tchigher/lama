@@ -1,7 +1,6 @@
 package co.ledger.lama.api
 
 import cats.effect.{ExitCode, IO, IOApp}
-import co.ledger.lama.api.config.Config
 import config.Config
 import pureconfig.ConfigSource
 

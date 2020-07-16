@@ -1,6 +1,6 @@
 package co.ledger.lama.api
 
-import co.ledger.template.model.{Email, User, UserName}
+import co.ledger.lama.api.model.{Email, User, UserName}
 
 object TestUsers {
 

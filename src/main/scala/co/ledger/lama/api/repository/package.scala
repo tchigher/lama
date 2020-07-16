@@ -1,7 +1,6 @@
 package co.ledger.lama.api
 
-import co.ledger.lama.api.model.User
-import co.ledger.template.model._
+import co.ledger.lama.api.model._
 
 package object repository {
 

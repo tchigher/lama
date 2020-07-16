@@ -2,8 +2,8 @@ package co.ledger.lama.api.repository
 
 import cats.effect.{Blocker, IO}
 import doobie.h2.H2Transactor
-import co.ledger.template.IOAssertion
-import co.ledger.template.TestUsers._
+import co.ledger.lama.api.IOAssertion
+import co.ledger.lama.api.TestUsers._
 
 class UserRepositorySpec extends RepositorySpec {
 

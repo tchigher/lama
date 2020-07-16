@@ -2,9 +2,9 @@ package co.ledger.lama.api.service
 
 import cats.effect.IO
 import cats.effect.concurrent.Ref
-import co.ledger.template.{TestUsers, model}
-import co.ledger.template.model.UserName
-import co.ledger.template.repository.algebra.UserRepository
+import co.ledger.lama.api.{TestUsers, model}
+import co.ledger.lama.api.model.UserName
+import co.ledger.lama.api.repository.algebra.UserRepository
 
 object TestUserService {
 

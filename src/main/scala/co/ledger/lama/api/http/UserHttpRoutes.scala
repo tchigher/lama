@@ -3,12 +3,9 @@ package co.ledger.lama.api.http
 import cats.effect._
 import cats.syntax.flatMap._
 import cats.syntax.functor._
-import co.ledger.lama.api.model.{CreateUser, UpdateUser}
+import co.ledger.lama.api.model._
 import co.ledger.lama.api.service.UserService
 import co.ledger.lama.api.validation.UserValidation
-import co.ledger.template.model._
-import co.ledger.template.service.UserService
-import co.ledger.template.validation.UserValidation
 import io.circe.generic.auto._
 import io.circe.syntax._
 import org.http4s._

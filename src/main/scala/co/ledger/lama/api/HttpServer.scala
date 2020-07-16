@@ -2,12 +2,10 @@ package co.ledger.lama.api
 
 import cats.data.ReaderT
 import cats.effect.{Blocker, ConcurrentEffect, ContextShift, Resource, Timer}
-import co.ledger.lama.api.config.{Config, ServerConfig}
 import co.ledger.lama.api.http.{HttpErrorHandler, UserHttpRoutes}
 import co.ledger.lama.api.repository.PostgresUserRepository
 import co.ledger.lama.api.service.UserService
 import config.{Config, ServerConfig}
-import co.ledger.template.http.UserHttpRoutes
 import doobie.hikari.HikariTransactor
 import doobie.util.ExecutionContexts
 import org.http4s.HttpRoutes

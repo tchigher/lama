@@ -4,7 +4,6 @@ import cats.data.ValidatedNel
 import cats.syntax.apply._
 import cats.syntax.validated._
 import co.ledger.lama.api.model.{CreateUser, Email, UpdateUser, User, UserName}
-import co.ledger.template.model._
 
 object validation {
 

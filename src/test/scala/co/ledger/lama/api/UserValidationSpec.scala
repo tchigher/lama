@@ -1,7 +1,7 @@
 package co.ledger.lama.api
 
-import co.ledger.template.model.CreateUser
-import co.ledger.template.validation.UserValidation
+import co.ledger.lama.api.model.CreateUser
+import co.ledger.lama.api.validation.UserValidation
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 

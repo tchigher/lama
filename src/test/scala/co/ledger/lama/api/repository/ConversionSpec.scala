@@ -1,6 +1,6 @@
 package co.ledger.lama.api.repository
 
-import co.ledger.template.model.{Email, User, UserName}
+import co.ledger.lama.api.model.{Email, User, UserName}
 import org.scalacheck._
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers

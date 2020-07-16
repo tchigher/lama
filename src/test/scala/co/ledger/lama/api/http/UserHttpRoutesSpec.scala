@@ -1,11 +1,11 @@
 package co.ledger.lama.api.http
 
 import cats.effect.IO
-import co.ledger.template.IOAssertion
-import co.ledger.template.TestUsers._
-import co.ledger.template.http.ResponseBodyUtils._
-import co.ledger.template.model.{CreateUser, UserName}
-import co.ledger.template.service.TestUserService
+import co.ledger.lama.api.IOAssertion
+import co.ledger.lama.api.TestUsers._
+import co.ledger.lama.api.http.ResponseBodyUtils._
+import co.ledger.lama.api.model.{CreateUser, UserName}
+import co.ledger.lama.api.service.TestUserService
 import io.circe.generic.auto._
 import org.http4s.circe._
 import org.http4s.{EntityEncoder, HttpRoutes, Method, Request, Status, Uri}

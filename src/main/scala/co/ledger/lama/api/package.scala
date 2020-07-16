@@ -3,7 +3,6 @@ package co.ledger.lama
 import cats.data.ReaderT
 import cats.effect.Resource
 import co.ledger.lama.api.config.Config
-import co.ledger.template.config.Config
 
 package object api {
 
