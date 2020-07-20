@@ -1,5 +1,7 @@
 package co.ledger.lama.api
 
+import scala.util.Try
+
 object model {
 
   case class Email(value: String) extends AnyVal
@@ -16,5 +18,13 @@ object model {
   // Http model
   case class CreateUser(username: String, email: String)
   case class UpdateUser(email: String)
+
+  object Currency extends Enumeration {
+    val BitcoinUnspecified, BitcoinTestnet3, BitcoinMainnet, BitcoinRegtest = Value
+
+    def unapply(arg: String): Option[Value] = {
+      Try(withName(arg)).toOption
+    }
+  }
 
 }
