@@ -15,7 +15,14 @@ class AccountRoutes[F[_]: Sync] extends Http4sDsl[F] {
     case GET -> Root / id => ???
     case DELETE -> Root / id => ???
     case GET -> Root / id / "state" => ???
-    case GET -> Root / "balances" => ???
+    case GET -> Root / "balances" =>
+      // {
+      //  "<accountId1>": "7",
+      //  "<accountId2>": "14",
+      //  "<accountId3>": "21"
+      // }
+      ???
+      // return a list of observable addresses
     case GET -> Root / id / "addresses" :? From(from) :? To(to) => ???
     case GET -> Root / id / "addresses" / "fresh" => ???
     case GET -> Root / id / "utxo" => ???
