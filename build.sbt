@@ -1,5 +1,5 @@
 // Enable plugins
-enablePlugins(DockerPlugin)
+enablePlugins(DockerPlugin, Fs2Grpc)
 
 lazy val assemblyFolder = file("assembly")
 lazy val ignoreFiles    = List("application.conf.sample")
@@ -15,6 +15,7 @@ libraryDependencies ++= Dependencies.all
 
 // Projects
 lazy val root = (project in file("."))
+  .enablePlugins(DockerPlugin, Fs2Grpc)
   .settings(
     organization := "co.ledger",
     name := "lama-api",
