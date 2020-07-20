@@ -3,6 +3,7 @@ package co.ledger.lama.api
 import cats.effect.{ExitCode, IO, IOApp}
 import config.Config
 import pureconfig.ConfigSource
+import pureconfig.generic.auto._
 
 // The only place where the Effect is defined. You could change it for `TaskApp` and `monix.eval.Task` for example.
 object App extends IOApp {

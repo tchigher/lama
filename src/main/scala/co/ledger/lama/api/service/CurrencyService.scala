@@ -5,8 +5,9 @@ import cats.implicits._
 import co.ledger.protobuf.BitcoinService.BitcoinServiceFs2Grpc
 import co.ledger.lama.api.model.Currency
 import co.ledger.protobuf.BitcoinService.{BitcoinNetwork, ChainParams, ValidateAddressRequest}
+import io.grpc.Metadata
 
-class CurrencyService[F[_]: Monad](bitcoinService: BitcoinServiceFs2Grpc[F, Unit]) {
+class CurrencyService[F[_]: Monad](bitcoinService: BitcoinServiceFs2Grpc[F, Metadata]) {
   def validateAddress(currency: Currency.Value, address: String): F[Boolean] = {
     val networkParams = currency match {
       case Currency.BitcoinMainnet => BitcoinNetwork.BITCOIN_NETWORK_MAINNET
@@ -18,7 +19,7 @@ class CurrencyService[F[_]: Monad](bitcoinService: BitcoinServiceFs2Grpc[F, Unit
       address = address,
       chainParams = Some(ChainParams(ChainParams.Network.BitcoinNetwork(networkParams)))
     )
-    bitcoinService.validateAddress(validateAddressRequest, ())
+    bitcoinService.validateAddress(validateAddressRequest, new Metadata())
       .map(_.isValid)
   }
 }
