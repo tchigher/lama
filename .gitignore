@@ -1,0 +1,7 @@
+.metals
+.bloop
+account-manager/target
+.idea
+assembly
+.sbt
+.DS_Store
