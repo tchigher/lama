@@ -18,7 +18,7 @@ lazy val root = (project in file("."))
   .enablePlugins(DockerPlugin, Fs2Grpc)
   .settings(
     organization := "co.ledger",
-    name := "lama-api",
+    name := "lama-bitcoin-service",
     version := "0.0.1-SNAPSHOT",
     cleanFiles += assemblyFolder,
     test in assembly := {},
