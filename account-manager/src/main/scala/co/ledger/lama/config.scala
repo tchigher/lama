@@ -13,8 +13,8 @@ object config {
 
   case class Config(
       postgres: PostgresConfig,
-      server: ServerConfig,
-      orchestator: OrchestratorConfig,
+      grpcServer: GrpcServerConfig,
+      orchestrator: OrchestratorConfig,
       rabbit: Fs2RabbitConfig
   )
 
@@ -26,13 +26,10 @@ object config {
     implicit val rabbitConfigReader: ConfigReader[Fs2RabbitConfig] = deriveReader[Fs2RabbitConfig]
   }
 
-  case class ServerConfig(
-      host: String,
-      port: Int
-  )
+  case class GrpcServerConfig(port: Int)
 
-  object ServerConfig {
-    implicit val serverConfigReader: ConfigReader[ServerConfig] = deriveReader[ServerConfig]
+  object GrpcServerConfig {
+    implicit val serverConfigReader: ConfigReader[GrpcServerConfig] = deriveReader[GrpcServerConfig]
   }
 
   case class PostgresConfig(
@@ -40,7 +37,8 @@ object config {
       user: String,
       password: String
   ) {
-    def driver: String = "org.postgresql.Driver"
+    val driver: String = "org.postgresql.Driver"
+    val poolSize: Int  = Runtime.getRuntime.availableProcessors() * 2
   }
 
   object PostgresConfig {

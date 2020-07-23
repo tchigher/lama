@@ -10,7 +10,9 @@ services:
       SYNC_EVENT_EXCHANGE_NAME: ${SYNC_EVENT_EXCHANGE_NAME:-account_sync_event}
       SYNC_EVENT_QUEUE_NAME: ${SYNC_EVENT_QUEUE_NAME:-account_sync_event}
       WORKER_EXCHANGE_NAME: ${WORKER_EXCHANGE_NAME:-account_to_sync}
-      BITCOIN_SYNC_INTERVAL: ${BITCOIN_SYNC_INTERVAL:-600s}
+      RABBIT_USERNAME: ${RABBIT_USERNAME:-lama}
+      RABBIT_PASSWORD: ${RABBIT_PASSWORD:-serge}
+      BITCOIN_SYNC_FREQUENCY: ${BITCOIN_SYNC_FREQUENCY:-600s}
     depends_on:
       - postgres
       - flyway
@@ -40,6 +42,9 @@ services:
 
   rabbitmq:
     image: rabbitmq:${RABBITMQ_VERSION:-3.8.5-management}
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBIT_USERNAME:-lama}
+      RABBITMQ_DEFAULT_PASS: ${RABBIT_PASSWORD:-serge}
     command: rabbitmq-server
     ports:
       - "5672:5672"

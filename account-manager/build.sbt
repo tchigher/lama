@@ -26,7 +26,7 @@ lazy val root = (project in file("."))
   .enablePlugins(BuildInfoPlugin)
   .settings(
     organization := "co.ledger",
-    name := "lama-api-account-manager",
+    name := "lama-account-manager",
     version := "0.0.1-SNAPSHOT",
     buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion, git.gitHeadCommit),
     buildInfoPackage := "buildinfo",

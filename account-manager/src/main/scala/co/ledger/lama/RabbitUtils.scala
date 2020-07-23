@@ -1,10 +1,12 @@
 package co.ledger.lama
 
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.Executors
 
 import cats.data.Kleisli
-import cats.effect.IO
+import cats.effect.{Blocker, ConcurrentEffect, ContextShift, IO, Resource}
 import cats.implicits._
+import dev.profunktor.fs2rabbit.config.Fs2RabbitConfig
 import dev.profunktor.fs2rabbit.config.declaration.DeclarationQueueConfig
 import dev.profunktor.fs2rabbit.effects.MessageEncoder
 import dev.profunktor.fs2rabbit.interpreter.RabbitClient
@@ -14,6 +16,14 @@ import io.circe.syntax._
 import io.circe.{Decoder, Encoder}
 
 object RabbitUtils {
+
+  def createClient(
+      conf: Fs2RabbitConfig
+  )(implicit ce: ConcurrentEffect[IO], cs: ContextShift[IO]): Resource[IO, RabbitClient[IO]] =
+    Resource
+      .make(IO(Executors.newCachedThreadPool()))(es => IO(es.shutdown()))
+      .map(Blocker.liftExecutorService)
+      .evalMap(RabbitClient[IO](conf, _))
 
   def createAutoAckConsumer[A](
       R: RabbitClient[IO],
