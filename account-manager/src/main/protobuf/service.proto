@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package pb.v1;
+option java_package = "co.ledger.lama.manager.protobuf";
+
+// Exposes a gRPC interface to manage synchronization of
+// account infos and transactions.
+service AccountManagerService {
+    rpc registerAccountToSync(AccountInfoRequest) returns (AccountInfoResponse) {}
+}
+
+message AccountInfoRequest {
+    string extendedKey = 1;
+    CoinFamily coinFamily = 2;
+    Coin coin = 3;
+    uint64 syncFrequency = 4;
+}
+
+message AccountInfoResponse {
+    bytes accountId = 1;
+    bytes syncId = 2;
+    uint64 syncFrequency = 3;
+}
+
+enum CoinFamily {
+    bitcoin = 0;
+}
+
+enum Coin {
+    btc = 0;
+}

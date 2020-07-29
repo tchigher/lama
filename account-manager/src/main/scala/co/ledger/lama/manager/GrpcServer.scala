@@ -1,7 +1,7 @@
-package co.ledger.lama
+package co.ledger.lama.manager
 
 import cats.effect.{IO, Resource}
-import co.ledger.lama.config.GrpcServerConfig
+import co.ledger.lama.manager.config.GrpcServerConfig
 import io.grpc.{Server, ServerBuilder, ServerServiceDefinition}
 import org.lyranthe.fs2_grpc.java_runtime.implicits._
 

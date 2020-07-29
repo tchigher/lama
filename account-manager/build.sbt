@@ -21,6 +21,8 @@ flywayUrl := "jdbc:postgresql://localhost:5432/lama"
 flywayUser := "lama"
 flywayPassword := "serge"
 
+scalapbCodeGeneratorOptions += CodeGeneratorOption.FlatPackage
+
 // Projects
 lazy val root = (project in file("."))
   .enablePlugins(BuildInfoPlugin)

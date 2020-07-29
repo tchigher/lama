@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   app:
-    image: ledgerhq/lama-orchestrator:${LAMA_ORCHESTRATOR_VERSION:-latest}
+    image: ledgerhq/lama-account-manager:${LAMA_ACCOUNT_MANAGER_VERSION:-latest}
     environment:
       JDBC_URL: ${JDBC_URL:-jdbc:postgresql:lama}
       DB_USER: ${DB_USER:-lama}

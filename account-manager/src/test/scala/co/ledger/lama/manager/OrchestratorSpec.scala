@@ -1,9 +1,12 @@
-package co.ledger.lama
+package co.ledger.lama.manager
+
 import java.util.UUID
 
 import cats.effect.{ContextShift, IO, Timer}
-import co.ledger.lama.model.{SyncEvent, SyncPayload}
+import co.ledger.lama.manager.config.CoinConfig
+import co.ledger.lama.manager.models.{Coin, CoinFamily, SyncEvent, SyncPayload}
 import fs2.{Pipe, Stream}
+import io.circe.Json
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
 
@@ -33,13 +36,20 @@ class OrchestratorSpec extends AnyFlatSpecLike with Matchers {
 
 }
 
-class FakeOrchestrator(nbEvents: Int, awakeEveryInterval: FiniteDuration)(implicit
-    t: Timer[IO]
-) extends Orchestrator {
+class FakeOrchestrator(nbEvents: Int, awakeEveryInterval: FiniteDuration) extends Orchestrator {
 
   var insertedEvents: mutable.Seq[SyncEvent] = mutable.Seq.empty
 
-  val syncPayloads: Seq[SyncPayload] = Fixtures.generateSyncPayloads(nbEvents)
+  val syncPayloads: Seq[SyncPayload] =
+    (1 to nbEvents).map { i =>
+      SyncPayload(
+        accountId = UUID.randomUUID(),
+        syncId = UUID.randomUUID(),
+        extendedKey = s"xpub-$i",
+        coinFamily = CoinFamily.Bitcoin,
+        payload = Json.obj()
+      )
+    }
 
   val updaters: List[FakeUpdater] = List(new FakeUpdater(syncPayloads, awakeEveryInterval))
 
@@ -49,7 +59,7 @@ class FakeOrchestrator(nbEvents: Int, awakeEveryInterval: FiniteDuration)(implic
   def syncEventSource: Stream[IO, SyncEvent] =
     Stream.emits(
       syncPayloads.map(sp =>
-        SyncEvent(sp.accountId, sp.syncId, SyncEvent.Status.Synchronized, sp.blockHeight)
+        SyncEvent(sp.accountId, sp.syncId, SyncEvent.Status.Synchronized, sp.payload)
       )
     )
 
@@ -57,6 +67,8 @@ class FakeOrchestrator(nbEvents: Int, awakeEveryInterval: FiniteDuration)(implic
 
 class FakeUpdater(events: Seq[SyncPayload], val awakeEveryInterval: FiniteDuration)
     extends Updater {
+
+  val conf: CoinConfig = CoinConfig(CoinFamily.Bitcoin, Coin.Btc, awakeEveryInterval)
 
   var sentSyncPayloadsByAccountId: mutable.Map[UUID, List[SyncPayload]] = mutable.Map.empty
 

@@ -1,4 +1,4 @@
-package co.ledger.lama
+package co.ledger.lama.manager.utils
 
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.Executors
@@ -12,8 +12,8 @@ import dev.profunktor.fs2rabbit.effects.MessageEncoder
 import dev.profunktor.fs2rabbit.interpreter.RabbitClient
 import dev.profunktor.fs2rabbit.model._
 import fs2.Stream
-import io.circe.syntax._
 import io.circe.{Decoder, Encoder}
+import io.circe.syntax._
 
 object RabbitUtils {
 

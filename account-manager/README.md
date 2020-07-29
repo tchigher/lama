@@ -12,7 +12,7 @@ Lama - Account Manager
 
 # Database migration
 
-The project uses [flywayt-sbt][flywayt-sbt] to migrate sql scripts in the folder `src/main/resources/db.migration`.
+The project uses [flywayt-sbt][flywayt-sbt] to migrate sql scripts in the folder `src/main/resources/db/migration`.
 
 Migrate your database using `sbt flywayMigrate` or clean it using `sbt flywayClean.
 

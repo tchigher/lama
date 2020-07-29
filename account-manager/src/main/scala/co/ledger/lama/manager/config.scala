@@ -1,6 +1,6 @@
-package co.ledger.lama
+package co.ledger.lama.manager
 
-import co.ledger.lama.model.CoinFamily
+import co.ledger.lama.manager.models.{Coin, CoinFamily}
 import dev.profunktor.fs2rabbit.config.{Fs2RabbitConfig, Fs2RabbitNodeConfig}
 import dev.profunktor.fs2rabbit.model.{ExchangeName, QueueName}
 import pureconfig.ConfigReader
@@ -18,7 +18,6 @@ object config {
       rabbit: Fs2RabbitConfig
   )
 
-  // implicit instances for a type go in to the companion object
   object Config {
     implicit val configReader: ConfigReader[Config] = deriveReader[Config]
     implicit val rabbitNodeConfigReader: ConfigReader[Fs2RabbitNodeConfig] =
@@ -49,7 +48,7 @@ object config {
       syncEventExchangeName: ExchangeName,
       syncEventQueueName: QueueName,
       workerExchangeName: ExchangeName,
-      updaters: List[UpdaterConfig]
+      updaters: List[CoinConfig]
   )
 
   object OrchestratorConfig {
@@ -62,12 +61,13 @@ object config {
     implicit val queueNameReader: ConfigReader[QueueName] =
       ConfigReader.fromString(str => Right(QueueName(str)))
 
-    implicit val updatersReader: ConfigReader[UpdaterConfig] =
-      deriveReader[UpdaterConfig]
+    implicit val updatersReader: ConfigReader[CoinConfig] =
+      deriveReader[CoinConfig]
   }
 
-  case class UpdaterConfig(
+  case class CoinConfig(
       coinFamily: CoinFamily,
+      coin: Coin,
       syncFrequency: FiniteDuration
   )
 }
