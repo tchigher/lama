@@ -1,10 +1,9 @@
 CREATE TYPE sync_status as ENUM(
     'registered',
-    'worker_acked',
-    'interpreter_acked',
+    'unregistered',
     'synchronized',
-    'failed',
-    'unregistered'
+    'deleted',
+    'failed'
 );
 
 CREATE TYPE coin_family as ENUM(
@@ -32,6 +31,8 @@ CREATE TABLE account_sync_event(
     payload JSONB NOT NULL DEFAULT '{}'::jsonb,
     updated TIMESTAMP NOT NULL DEFAUlT CURRENT_TIMESTAMP
 );
+
+CREATE UNIQUE INDEX account_sync_event_updated_index ON account_sync_event(updated);
 
 CREATE VIEW account_sync_status AS (
     SELECT DISTINCT ON (account_id)

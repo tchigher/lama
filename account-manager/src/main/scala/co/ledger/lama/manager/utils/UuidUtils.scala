@@ -23,6 +23,6 @@ object UuidUtils {
   }
 
   def fromAccountIdentifier(extendedKey: String, coinFamily: CoinFamily, coin: Coin): UUID =
-    UUID.nameUUIDFromBytes(s"$extendedKey${coinFamily.name}${coin.name}".getBytes)
+    UUID.nameUUIDFromBytes((extendedKey + coinFamily.name + coin.name).getBytes)
 
 }

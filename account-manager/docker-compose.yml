@@ -1,32 +1,31 @@
 version: '3.8'
 
 services:
-  app:
+  lama-app:
     image: ledgerhq/lama-account-manager:${LAMA_ACCOUNT_MANAGER_VERSION:-latest}
     environment:
-      JDBC_URL: ${JDBC_URL:-jdbc:postgresql:lama}
+      GRPC_SERVER_PORT: ${GRPC_SERVER_PORT:-9999}
+      JDBC_URL: ${JDBC_URL:-jdbc:postgresql://lama-postgres:5432/lama}
       DB_USER: ${DB_USER:-lama}
       DB_PASSWORD: ${DB_PASSWORD:-serge}
-      SYNC_EVENT_EXCHANGE_NAME: ${SYNC_EVENT_EXCHANGE_NAME:-account_sync_event}
-      SYNC_EVENT_QUEUE_NAME: ${SYNC_EVENT_QUEUE_NAME:-account_sync_event}
-      WORKER_EXCHANGE_NAME: ${WORKER_EXCHANGE_NAME:-account_to_sync}
+      WORKER_EXCHANGE_NAME: ${WORKER_EXCHANGE_NAME:-worker_events}
+      EVENTS_EXCHANGE_NAME: ${EVENTS_EXCHANGE_NAME:-events}
+      RABBIT_HOST: ${RABBIT_HOST:-lama-rabbitmq}
+      RABBIT_PORT: ${RABBI_PORT:-5672}
+      RABBIT_VIRTUAL_HOST: ${RABBIT_VIRTUAL_HOST:-/}
+      RABBIT_CONNECTION_TIMEOUT: ${RABBIT_CONNECTION_TIMEOUT:-3}
+      RABBIT_SSL: ${RABBIT_SSL:-false}
       RABBIT_USERNAME: ${RABBIT_USERNAME:-lama}
       RABBIT_PASSWORD: ${RABBIT_PASSWORD:-serge}
+      REDIS_HOST: ${REDIS_HOST:-lama-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
       BITCOIN_SYNC_FREQUENCY: ${BITCOIN_SYNC_FREQUENCY:-600s}
     depends_on:
-      - postgres
-      - flyway
-      - rabbitmq
+      - lama-postgres
+      - lama-flyway
+      - lama-rabbitmq
 
-  flyway:
-    image: flyway/flyway:${FLYWAY_VERSION:-6.5.1}
-    command: -url=${JDBC_URL:-jdbc:postgresql://postgres:5432/lama} -user=${DB_USER:-lama} -password=${DB_PASSWORD:-serge} -connectRetries=60 migrate
-    volumes:
-      - "./src/main/resources/db/migration:/flyway/sql"
-    depends_on:
-      - postgres
-
-  postgres:
+  lama-postgres:
     image: postgres:${POSTGRES_VERSION:-12}
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-lama}
@@ -40,7 +39,7 @@ services:
       timeout: 5s
       retries: 5
 
-  rabbitmq:
+  lama-rabbitmq:
     image: rabbitmq:${RABBITMQ_VERSION:-3.8.5-management}
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBIT_USERNAME:-lama}
@@ -54,3 +53,17 @@ services:
       interval: 5s
       timeout: 15s
       retries: 10
+
+  lama-redis:
+    image: redis:${REDIS_VERSION:-6.0.6-alpine}
+    ports:
+      - "6379:6379"
+
+  lama-flyway:
+    image: flyway/flyway:${FLYWAY_VERSION:-6.5.1}
+    command: -url=${JDBC_URL:-jdbc:postgresql://lama-postgres:5432/lama} -user=${DB_USER:-lama} -password=${DB_PASSWORD:-serge} -connectRetries=60 migrate
+    volumes:
+      - "./src/main/resources/db/migration:/flyway/sql"
+    depends_on:
+      - lama-postgres
+

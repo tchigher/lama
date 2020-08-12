@@ -2,56 +2,52 @@ package co.ledger.lama.manager
 
 import cats.effect.{Concurrent, IO, Timer}
 import co.ledger.lama.manager.config.OrchestratorConfig
-import co.ledger.lama.manager.models.SyncEvent
-import co.ledger.lama.manager.utils.RabbitUtils
+import com.redis.RedisClient
 import dev.profunktor.fs2rabbit.interpreter.RabbitClient
-import dev.profunktor.fs2rabbit.model.RoutingKey
-import doobie.implicits._
 import doobie.util.transactor.Transactor
 import fs2.Stream
+import scala.concurrent.duration._
 
 trait Orchestrator {
 
-  // updaters which have a stream constructor
-  val updaters: List[Updater]
+  // tasks which have candidates and reports streams
+  val tasks: List[EventTask]
 
-  // inserter of sync event
-  def inserter(e: SyncEvent): IO[Unit]
+  // duration to awake every 'd' candidates stream
+  val awakeEvery: FiniteDuration = 5.seconds
 
-  // source of sync events
-  def syncEventSource: Stream[IO, SyncEvent]
+  def run(n: Option[Long] = None)(implicit c: Concurrent[IO], t: Timer[IO]): Stream[IO, Unit] = {
 
-  // from sync events source, insert them with the `inserter` function
-  def syncEventInserts: Stream[IO, Unit] =
-    syncEventSource.evalMap(inserter).drain
+    val candidateEventsPipeline =
+      Stream
+        .emits(tasks)                     // emit tasks
+        .map(_.candidates(awakeEvery, n)) // for each, call candidates stream
+        .parJoinUnbounded                 // race all inner streams simultaneously
 
-  def run(n: Option[Long] = None)(implicit c: Concurrent[IO], t: Timer[IO]): Stream[IO, Unit] =
-    Stream
-      .emits(updaters)                // emit updaters
-      .map(_.updates(n))              // for each updaters, create a stream
-      .parJoinUnbounded               // race all inner streams simultaneously
-      .concurrently(syncEventInserts) // also, at the same time, source sync events and insert them
+    val reportsFinishedEventsPipeline =
+      Stream
+        .emits(tasks)     // emit tasks
+        .map(_.reports)   // for each, call reports stream
+        .parJoinUnbounded // race all inner streams simultaneously
+
+    // race the stream of candidate events
+    // and also, at the same, race the stream of report events.
+    candidateEventsPipeline
+      .concurrently(reportsFinishedEventsPipeline)
+  }
 
 }
 
-class CoinSyncOrchestrator(
+class CoinOrchestrator(
     val conf: OrchestratorConfig,
     val db: Transactor[IO],
-    val rabbitClient: RabbitClient[IO]
+    val rabbit: RabbitClient[IO],
+    val redis: RedisClient
 ) extends Orchestrator {
 
-  val updaters: List[Updater] =
-    conf.updaters.map(new CoinUpdater(conf.workerExchangeName, _, db, rabbitClient))
-
-  def inserter(se: SyncEvent): IO[Unit] = Queries.insertSyncEvent(se).transact(db).void
-
-  def syncEventSource: Stream[IO, SyncEvent] =
-    RabbitUtils
-      .createAutoAckConsumer[SyncEvent](
-        rabbitClient,
-        conf.syncEventExchangeName,
-        RoutingKey("*"),
-        conf.syncEventQueueName
-      )
+  val tasks: List[CoinTask] =
+    conf.coins.map(
+      new CoinTask(conf.workerExchangeName, conf.eventsExchangeName, _, db, rabbit, redis)
+    )
 
 }

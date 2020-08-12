@@ -6,7 +6,7 @@ import cats.implicits._
 import doobie.util.meta.Meta
 import io.circe.parser.parse
 import io.circe.{Decoder, Encoder, Json}
-import org.postgresql.util.{PGInterval, PGobject}
+import org.postgresql.util.PGobject
 
 object implicits {
 
@@ -22,7 +22,5 @@ object implicits {
         o.setValue(a.noSpaces)
         o
       })
-
-  implicit val pgIntervalMeta: Meta[PGInterval] = Meta.Advanced.other[PGInterval]("interval")
 
 }

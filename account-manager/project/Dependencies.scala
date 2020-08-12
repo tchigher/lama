@@ -26,12 +26,14 @@ object Dependencies extends DependencyBuilders with LibraryManagementSyntax {
   val logbackVersion    = "1.2.3"
   val fs2Version        = "2.4.2"
   val fs2RabbitVersion  = "2.1.1"
+  val scalaRedisVersion = "3.30"
   val utilities: Seq[ModuleID] = Seq(
     "co.fs2"                %% "fs2-core"          % fs2Version,
     "dev.profunktor"        %% "fs2-rabbit"        % fs2RabbitVersion,
     "ch.qos.logback"         % "logback-classic"   % logbackVersion,
     "com.github.pureconfig" %% "pureconfig"        % pureconfigVersion,
     "com.github.pureconfig" %% "pureconfig-cats"   % pureconfigVersion,
+    "net.debasishg"         %% "redisclient"       % scalaRedisVersion,
     "io.grpc"                % "grpc-netty-shaded" % scalapb.compiler.Version.grpcJavaVersion
   )
 
@@ -39,12 +41,14 @@ object Dependencies extends DependencyBuilders with LibraryManagementSyntax {
   val scalaTestPlusVersion = "3.2.0.0"
   val scalaCheckVersion    = "1.14.3"
   val otjPgEmbeddedVersion = "0.13.3"
+  val embeddedRedisVersion = "0.7.3"
   val test: Seq[ModuleID] = Seq(
     "org.scalatest"           %% "scalatest"        % scalaTestVersion     % Test,
     "org.scalacheck"          %% "scalacheck"       % scalaCheckVersion    % Test,
     "org.scalatestplus"       %% "scalacheck-1-14"  % scalaTestPlusVersion % Test,
     "org.tpolecat"            %% "doobie-scalatest" % doobieVersion        % Test,
-    "com.opentable.components" % "otj-pg-embedded"  % otjPgEmbeddedVersion % Test
+    "com.opentable.components" % "otj-pg-embedded"  % otjPgEmbeddedVersion % Test,
+    "it.ozimov"                % "embedded-redis"   % embeddedRedisVersion % Test
   )
 
   val all: Seq[ModuleID] = circe ++ db ++ utilities ++ test

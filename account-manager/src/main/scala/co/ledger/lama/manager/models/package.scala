@@ -4,7 +4,6 @@ import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 import cats.data.NonEmptyList
-import dev.profunktor.fs2rabbit.model.RoutingKey
 import doobie.postgres.implicits._
 import doobie.util.Read
 import doobie.util.meta.Meta
@@ -25,37 +24,50 @@ package object models {
   )
 
   object SyncEvent {
-    def register(accountId: UUID): SyncEvent =
+    def from(accountId: UUID, status: SyncEvent.Status): SyncEvent =
       SyncEvent(
         accountId,
         UUID.randomUUID(),
-        SyncEvent.Status.Registered
+        status
       )
 
     implicit val encoder: Encoder[SyncEvent] = deriveEncoder[SyncEvent]
     implicit val decoder: Decoder[SyncEvent] = deriveDecoder[SyncEvent]
 
-    abstract class Status(val name: String)
+    sealed trait Status {
+      def name: String
+      def isFinished: Boolean = isInstanceOf[FinalStatus]
+    }
+
+    abstract class InitialStatus(val name: String) extends Status
+    abstract class FinalStatus(val name: String)   extends Status
 
     object Status {
-      case object Registered              extends Status("registered")
-      case object WorkerAcknowledged      extends Status("worker_acked")
-      case object InterpreterAcknowledged extends Status("interpreter_acked")
-      case object Synchronized            extends Status("synchronized")
-      case object Failed                  extends Status("failed")
-      case object Unregistered            extends Status("unregistered")
+      // account available for sync
+      case object Registered extends InitialStatus("registered")
 
-      val syncCandidates: NonEmptyList[Status] =
-        NonEmptyList.of(Registered, Synchronized, Failed)
+      // account unavailable for sync
+      case object Unregistered extends InitialStatus("unregistered")
+
+      // account sync succeed
+      case object Synchronized extends FinalStatus("synchronized")
+
+      // account deletion succeed
+      case object Deleted extends FinalStatus("deleted")
+
+      // account sync/delete failed
+      case object Failed extends FinalStatus("failed")
+
+      val candidateStatuses: NonEmptyList[Status] =
+        NonEmptyList.of(Registered, Synchronized, Failed, Unregistered)
 
       val all: Map[String, Status] =
         Map(
-          Registered.name              -> Registered,
-          WorkerAcknowledged.name      -> WorkerAcknowledged,
-          InterpreterAcknowledged.name -> InterpreterAcknowledged,
-          Synchronized.name            -> Synchronized,
-          Failed.name                  -> Failed,
-          Unregistered.name            -> Unregistered
+          Registered.name   -> Registered,
+          Unregistered.name -> Unregistered,
+          Synchronized.name -> Synchronized,
+          Deleted.name      -> Deleted,
+          Failed.name       -> Failed
         )
 
       def fromKey(key: String): Option[Status] = all.get(key)
@@ -70,12 +82,7 @@ package object models {
     }
   }
 
-  abstract class CoinFamily(val name: String) {
-    def workerRoutingKey: RoutingKey =
-      this match {
-        case CoinFamily.Bitcoin => RoutingKey("bitcoin_worker")
-      }
-  }
+  abstract class CoinFamily(val name: String)
 
   object CoinFamily {
     case object Bitcoin extends CoinFamily("bitcoin")
@@ -125,12 +132,13 @@ package object models {
       accountId: UUID,
       syncId: UUID,
       extendedKey: String,
-      coinFamily: CoinFamily,
-      payload: Json
-  )
+      status: SyncEvent.Status,
+      payload: Json = Json.obj()
+  ) extends WithRedisKey(accountId)
 
   object SyncPayload {
     implicit val encoder: Encoder[SyncPayload] = deriveEncoder[SyncPayload]
+    implicit val decoder: Decoder[SyncPayload] = deriveDecoder[SyncPayload]
   }
 
   case class UpsertAccountInfoResult(accountId: UUID, syncFrequency: FiniteDuration)

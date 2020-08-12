@@ -1,8 +1,9 @@
 package co.ledger.lama.manager
 
-import cats.effect.{Blocker, ExitCode, IO, IOApp}
+import cats.effect.{Blocker, ExitCode, IO, IOApp, Resource}
 import co.ledger.lama.manager.config.Config
 import co.ledger.lama.manager.utils.RabbitUtils
+import com.redis.RedisClient
 import doobie.hikari.HikariTransactor
 import doobie.util.ExecutionContexts
 import pureconfig.ConfigSource
@@ -31,16 +32,21 @@ object App extends IOApp {
       // rabbitmq client
       rabbitClient <- RabbitUtils.createClient(conf.rabbit)
 
+      // redis client
+      redisClient <-
+        Resource.fromAutoCloseable(IO(new RedisClient(conf.redis.host, conf.redis.port)))
+
       // create the orchestrator
-      orchestrator = new CoinSyncOrchestrator(
+      orchestrator = new CoinOrchestrator(
         conf.orchestrator,
         db,
-        rabbitClient
+        rabbitClient,
+        redisClient
       )
 
       // define rpc service definitions
       serviceDefinitions = List(
-        new Service(db, conf.orchestrator.updaters).definition
+        new Service(db, conf.orchestrator.coins).definition
       )
 
       // create the grpc server

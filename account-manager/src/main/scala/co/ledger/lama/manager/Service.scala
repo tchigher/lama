@@ -6,9 +6,10 @@ import cats.effect.{ConcurrentEffect, IO}
 import co.ledger.lama.manager.Exceptions.CoinConfigurationException
 import co.ledger.lama.manager.config.CoinConfig
 import co.ledger.lama.manager.models.{Coin, CoinFamily, SyncEvent}
+import co.ledger.lama.manager.models.SyncEvent.Status
 import co.ledger.lama.manager.protobuf.{
   AccountInfoRequest,
-  AccountInfoResponse,
+  AccountInfoResult,
   AccountManagerServiceFs2Grpc
 }
 import co.ledger.lama.manager.utils.UuidUtils
@@ -21,7 +22,12 @@ import scala.concurrent.duration.FiniteDuration
 class Service(val db: Transactor[IO], val coinConfigs: List[CoinConfig])
     extends AccountManagerServiceFs2Grpc[IO, Metadata] {
 
-  def registerAccountToSync(request: AccountInfoRequest, ctx: Metadata): IO[AccountInfoResponse] = {
+  def definition(implicit ce: ConcurrentEffect[IO]) = AccountManagerServiceFs2Grpc.bindService(this)
+
+  def registerAccountToSync(
+      request: AccountInfoRequest,
+      ctx: Metadata
+  ): IO[AccountInfoResult] = {
     val coinFamily = CoinFamily.fromProtobuf(request.coinFamily)
     val coin       = Coin.fromProtobuf(request.coin)
 
@@ -55,8 +61,8 @@ class Service(val db: Transactor[IO], val coinConfigs: List[CoinConfig])
         accountId     = accountInfo.accountId
         syncFrequency = accountInfo.syncFrequency
 
-        // create the registered sync event
-        syncEvent = SyncEvent.register(accountId)
+        // create the sync event
+        syncEvent = SyncEvent.from(accountId, Status.Registered)
 
         // insert the sync event
         _ <- Queries.insertSyncEvent(syncEvent)
@@ -68,7 +74,7 @@ class Service(val db: Transactor[IO], val coinConfigs: List[CoinConfig])
           .transact(db)
           .map {
             case (accountId, syncId, syncFrequency) =>
-              AccountInfoResponse(
+              AccountInfoResult(
                 UuidUtils.uuidToBytes(accountId),
                 UuidUtils.uuidToBytes(syncId),
                 syncFrequency.toSeconds
@@ -77,6 +83,46 @@ class Service(val db: Transactor[IO], val coinConfigs: List[CoinConfig])
     } yield response
   }
 
-  def definition(implicit ce: ConcurrentEffect[IO]) = AccountManagerServiceFs2Grpc.bindService(this)
+  def unregisterAccountToSync(
+      request: AccountInfoRequest,
+      ctx: Metadata
+  ): IO[AccountInfoResult] = {
+    val coinFamily = CoinFamily.fromProtobuf(request.coinFamily)
+    val coin       = Coin.fromProtobuf(request.coin)
+    val accountId  = UuidUtils.fromAccountIdentifier(request.extendedKey, coinFamily, coin)
+
+    for {
+      existing <-
+        Queries
+          .getLastSyncEvent(accountId)
+          .transact(db)
+          .map(_.filter(e => e.status == Status.Unregistered || e.status == Status.Deleted))
+
+      result <- existing match {
+        case Some(e) =>
+          IO.pure(
+            AccountInfoResult(
+              UuidUtils.uuidToBytes(e.accountId),
+              UuidUtils.uuidToBytes(e.syncId)
+            )
+          )
+
+        case _ =>
+          // create the sync event
+          val syncEvent = SyncEvent.from(accountId, Status.Unregistered)
+
+          // insert the sync event
+          Queries
+            .insertSyncEvent(syncEvent)
+            .transact(db)
+            .map(_ =>
+              AccountInfoResult(
+                UuidUtils.uuidToBytes(syncEvent.accountId),
+                UuidUtils.uuidToBytes(syncEvent.syncId)
+              )
+            )
+      }
+    } yield result
+  }
 
 }

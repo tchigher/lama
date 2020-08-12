@@ -12,8 +12,8 @@ object CompilerFlags {
     "-language:higherKinds",         // Allow higher-kinded types
     "-language:implicitConversions", // Allow definition of implicit functions called views
     "-unchecked",                    // Enable additional warnings where generated code depends on assumptions.
-    //"-Vimplicits",                 // Show more detail on why some implicits are not applicable.
-    "-Xfatal-warnings" // Fail the compilation if there are any warnings.
+    "-Xfatal-warnings"               // Fail the compilation if there are any warnings.
+    //"-Vimplicits"                  // Show more detail on why some implicits are not applicable.
   )
 
   val lint = Seq(

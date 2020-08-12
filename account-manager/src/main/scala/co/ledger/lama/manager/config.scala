@@ -2,7 +2,7 @@ package co.ledger.lama.manager
 
 import co.ledger.lama.manager.models.{Coin, CoinFamily}
 import dev.profunktor.fs2rabbit.config.{Fs2RabbitConfig, Fs2RabbitNodeConfig}
-import dev.profunktor.fs2rabbit.model.{ExchangeName, QueueName}
+import dev.profunktor.fs2rabbit.model.ExchangeName
 import pureconfig.ConfigReader
 import pureconfig.generic.semiauto._
 import pureconfig.module.cats._
@@ -15,7 +15,8 @@ object config {
       postgres: PostgresConfig,
       grpcServer: GrpcServerConfig,
       orchestrator: OrchestratorConfig,
-      rabbit: Fs2RabbitConfig
+      rabbit: Fs2RabbitConfig,
+      redis: RedisConfig
   )
 
   object Config {
@@ -28,7 +29,7 @@ object config {
   case class GrpcServerConfig(port: Int)
 
   object GrpcServerConfig {
-    implicit val serverConfigReader: ConfigReader[GrpcServerConfig] = deriveReader[GrpcServerConfig]
+    implicit val configReader: ConfigReader[GrpcServerConfig] = deriveReader[GrpcServerConfig]
   }
 
   case class PostgresConfig(
@@ -41,27 +42,29 @@ object config {
   }
 
   object PostgresConfig {
-    implicit val postgresConfigReader: ConfigReader[PostgresConfig] = deriveReader[PostgresConfig]
+    implicit val configReader: ConfigReader[PostgresConfig] = deriveReader[PostgresConfig]
+  }
+
+  case class RedisConfig(host: String, port: Int)
+
+  object RedisConfig {
+    implicit val configReader: ConfigReader[RedisConfig] = deriveReader[RedisConfig]
   }
 
   case class OrchestratorConfig(
-      syncEventExchangeName: ExchangeName,
-      syncEventQueueName: QueueName,
       workerExchangeName: ExchangeName,
-      updaters: List[CoinConfig]
+      eventsExchangeName: ExchangeName,
+      coins: List[CoinConfig]
   )
 
   object OrchestratorConfig {
-    implicit val orchestratorConfigReader: ConfigReader[OrchestratorConfig] =
+    implicit val configReader: ConfigReader[OrchestratorConfig] =
       deriveReader[OrchestratorConfig]
 
-    implicit val exchangeNameReader: ConfigReader[ExchangeName] =
+    implicit val exchangeNameConfigReader: ConfigReader[ExchangeName] =
       ConfigReader.fromString(str => Right(ExchangeName(str)))
 
-    implicit val queueNameReader: ConfigReader[QueueName] =
-      ConfigReader.fromString(str => Right(QueueName(str)))
-
-    implicit val updatersReader: ConfigReader[CoinConfig] =
+    implicit val coinConfigReader: ConfigReader[CoinConfig] =
       deriveReader[CoinConfig]
   }
 
