@@ -4,7 +4,7 @@ import java.util.UUID
 
 import cats.effect.{IO, Timer}
 import co.ledger.lama.manager.config.CoinConfig
-import co.ledger.lama.manager.models.{SyncEvent, SyncPayload}
+import co.ledger.lama.manager.models.{SyncEvent, CandidateSyncEvent}
 import co.ledger.lama.manager.utils.RabbitUtils
 import com.redis.RedisClient
 import dev.profunktor.fs2rabbit.interpreter.RabbitClient
@@ -18,10 +18,10 @@ import scala.concurrent.duration.FiniteDuration
 trait EventTask {
 
   // source of candidate events
-  def candidateEventsSource: Stream[IO, SyncPayload]
+  def candidateEventsSource: Stream[IO, CandidateSyncEvent]
 
   // stream transformation from candidate events
-  def candidateEventsPipe: Pipe[IO, SyncPayload, Unit]
+  def candidateEventsPipe: Pipe[IO, CandidateSyncEvent, Unit]
 
   // stream which awake every tick then candidates sync events
   def candidates(tick: FiniteDuration, n: Option[Long] = None)(implicit
@@ -55,7 +55,7 @@ class CoinTask(
     redis: RedisClient
 ) extends EventTask {
 
-  def candidateEventsSource: Stream[IO, SyncPayload] =
+  def candidateEventsSource: Stream[IO, CandidateSyncEvent] =
     Queries
       .fetchCandidateEvents(conf.coinFamily, conf.coin)
       .transact(db)
@@ -64,14 +64,14 @@ class CoinTask(
 
   // publisher publishing to the worker exchange with routingKey = "coinFamily.coin"
   private val publisher =
-    new RabbitPublisher[UUID, SyncPayload](
+    new RabbitPublisher[UUID, CandidateSyncEvent](
       redis,
       rabbit,
       workerExchangeName,
       RoutingKey(namespace)
     )
 
-  def candidateEventsPipe: Pipe[IO, SyncPayload, Unit] = publisher.enqueue
+  def candidateEventsPipe: Pipe[IO, CandidateSyncEvent, Unit] = publisher.enqueue
 
   // consume event messages from rabbitmq
   def reportEventsSource: Stream[IO, SyncEvent] =

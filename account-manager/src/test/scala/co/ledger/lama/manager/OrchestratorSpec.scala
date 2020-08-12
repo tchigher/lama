@@ -4,7 +4,7 @@ import java.util.UUID
 
 import cats.effect.{ContextShift, IO, Timer}
 import co.ledger.lama.manager.models.SyncEvent.Status
-import co.ledger.lama.manager.models.{SyncEvent, SyncPayload}
+import co.ledger.lama.manager.models.{SyncEvent, CandidateSyncEvent}
 import fs2.{Pipe, Stream}
 import io.circe.Json
 import org.scalatest.flatspec.AnyFlatSpecLike
@@ -39,9 +39,9 @@ class OrchestratorSpec extends AnyFlatSpecLike with Matchers {
 class FakeOrchestrator(nbEvents: Int, override val awakeEvery: FiniteDuration)
     extends Orchestrator {
 
-  val syncPayloads: Seq[SyncPayload] =
+  val syncPayloads: Seq[CandidateSyncEvent] =
     (1 to nbEvents).map { i =>
-      SyncPayload(
+      CandidateSyncEvent(
         accountId = UUID.randomUUID(),
         syncId = UUID.randomUUID(),
         extendedKey = s"xpub-$i",
@@ -54,15 +54,15 @@ class FakeOrchestrator(nbEvents: Int, override val awakeEvery: FiniteDuration)
 
 }
 
-class FakeTask(events: Seq[SyncPayload]) extends EventTask {
+class FakeTask(events: Seq[CandidateSyncEvent]) extends EventTask {
 
   var reportedEvents: mutable.Seq[SyncEvent] = mutable.Seq.empty
 
-  var sentSyncPayloadsByAccountId: mutable.Map[UUID, List[SyncPayload]] = mutable.Map.empty
+  var sentSyncPayloadsByAccountId: mutable.Map[UUID, List[CandidateSyncEvent]] = mutable.Map.empty
 
-  def candidateEventsSource: Stream[IO, SyncPayload] = Stream.emits(events)
+  def candidateEventsSource: Stream[IO, CandidateSyncEvent] = Stream.emits(events)
 
-  def candidateEventsPipe: Pipe[IO, SyncPayload, Unit] =
+  def candidateEventsPipe: Pipe[IO, CandidateSyncEvent, Unit] =
     _.evalMap(sp =>
       IO.pure(
         sentSyncPayloadsByAccountId.update(

@@ -4,13 +4,16 @@ import java.util.UUID
 
 import cats.effect.{Blocker, ContextShift, IO, Resource}
 import co.ledger.lama.manager.config.CoinConfig
-import co.ledger.lama.manager.models.{Coin, CoinFamily}
-import co.ledger.lama.manager.protobuf.AccountInfoRequest
+import co.ledger.lama.manager.models.{Coin, CoinFamily, SyncEvent}
+import co.ledger.lama.manager.protobuf.BlockHeightState
 import co.ledger.lama.manager.utils.UuidUtils
 import co.ledger.lama.manager.{protobuf => pb}
 import com.opentable.db.postgres.embedded.{EmbeddedPostgres, FlywayPreparer}
 import doobie.hikari.HikariTransactor
+import doobie.implicits._
 import doobie.util.ExecutionContexts
+import doobie.util.transactor.Transactor
+import io.circe.Json
 import io.grpc.Metadata
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.flatspec.AnyFlatSpecLike
@@ -43,37 +46,43 @@ class ServiceSpec extends AnyFlatSpecLike with Matchers with BeforeAndAfterAll {
       )
     } yield xa
 
-  var registerAccountId: Option[UUID] = None
-  var syncId1: Option[UUID]           = None
+  var registeredAccountId: UUID = _
+  var registeredSyncId: UUID    = _
 
-  val bitcoinAccount: AccountInfoRequest =
-    pb.AccountInfoRequest("12345", pb.CoinFamily.bitcoin, pb.Coin.btc)
+  val registerBitcoinAccount: pb.RegisterAccountRequest =
+    pb.RegisterAccountRequest("12345", pb.CoinFamily.bitcoin, pb.Coin.btc)
 
-  it should "register an account" in IOAssertion {
+  it should "register a new account" in IOAssertion {
     transactor.use { db =>
       val service                     = new Service(db, conf.coins)
-      val defaultBitcoinSyncFrequency = conf.coins.headOption.map(_.syncFrequency.toSeconds)
+      val defaultBitcoinSyncFrequency = conf.coins.head.syncFrequency.toSeconds
 
-      service
-        .registerAccountToSync(bitcoinAccount, new Metadata())
-        .map { response =>
-          // should be an account uuid from extendKey, coinFamily, coin
-          registerAccountId = UuidUtils.bytesToUuid(response.accountId)
-          registerAccountId shouldBe Some(
-            UuidUtils.fromAccountIdentifier(
-              bitcoinAccount.extendedKey,
-              CoinFamily.Bitcoin,
-              Coin.Btc
-            )
+      for {
+        response <- service.registerAccount(registerBitcoinAccount, new Metadata())
+
+        accountId     = UuidUtils.bytesToUuid(response.accountId).get
+        syncId        = UuidUtils.bytesToUuid(response.syncId).get
+        syncFrequency = response.syncFrequency
+
+        event <- getLastEvent(db, accountId)
+      } yield {
+        registeredAccountId = accountId
+        registeredSyncId = syncId
+
+        // it should be an account uuid from extendKey, coinFamily, coin
+        accountId shouldBe
+          UuidUtils.fromAccountIdentifier(
+            registerBitcoinAccount.extendedKey,
+            CoinFamily.Bitcoin,
+            Coin.Btc
           )
 
-          // should be a new sync id
-          syncId1 = UuidUtils.bytesToUuid(response.syncId)
-          syncId1 should not be None
+        // it should be the default sync frequency from the bitcoin config
+        syncFrequency shouldBe defaultBitcoinSyncFrequency
 
-          // should be the default sync frequency from the bitcoin config
-          Some(response.syncFrequency) shouldBe defaultBitcoinSyncFrequency
-        }
+        // check event
+        event shouldBe Some(SyncEvent(accountId, syncId, SyncEvent.Status.Registered))
+      }
     }
   }
 
@@ -81,47 +90,126 @@ class ServiceSpec extends AnyFlatSpecLike with Matchers with BeforeAndAfterAll {
     transactor.use { db =>
       val service = new Service(db, conf.coins)
       val newAccountInfo =
-        bitcoinAccount.withSyncFrequency(10000L)
+        registerBitcoinAccount.withSyncFrequency(10000L)
 
-      service
-        .registerAccountToSync(newAccountInfo, new Metadata())
-        .map { response =>
-          // update existing registered account
-          UuidUtils.bytesToUuid(response.accountId) shouldBe registerAccountId
+      for {
+        response <- service.registerAccount(newAccountInfo, new Metadata())
 
-          // but it should be a new sync id
-          UuidUtils.bytesToUuid(response.syncId) should not be oneOf(None, syncId1)
+        accountId     = UuidUtils.bytesToUuid(response.accountId).get
+        syncId        = UuidUtils.bytesToUuid(response.syncId).get
+        syncFrequency = response.syncFrequency
 
-          // and sync frequency should be updated
-          response.syncFrequency shouldBe newAccountInfo.syncFrequency
-        }
+        event <- getLastEvent(db, accountId)
+      } yield {
+        // it should be the registered accountId
+        accountId shouldBe registeredAccountId
+
+        // it should be a new sync id
+        syncId should not be registeredSyncId
+
+        // the sync frequency should be updated
+        syncFrequency shouldBe newAccountInfo.syncFrequency
+
+        // check event
+        event shouldBe Some(SyncEvent(accountId, syncId, SyncEvent.Status.Registered))
+      }
     }
   }
 
-  var unregisterSyncId: Option[UUID] = None
+  it should "register an account from a blockHeight cursor" in IOAssertion {
+    transactor.use { db =>
+      val service          = new Service(db, conf.coins)
+      val blockHeightValue = 10L
+      val accountInfoWithCursor =
+        registerBitcoinAccount.withBlockHeight(BlockHeightState(blockHeightValue))
+
+      for {
+        response <- service.registerAccount(accountInfoWithCursor, new Metadata())
+
+        accountId = UuidUtils.bytesToUuid(response.accountId).get
+        syncId    = UuidUtils.bytesToUuid(response.syncId).get
+
+        event <- getLastEvent(db, accountId)
+      } yield {
+        // it should be the registered accountId
+        accountId shouldBe registeredAccountId
+
+        // it should be a new sync id
+        syncId should not be registeredSyncId
+
+        // check event
+        event shouldBe Some(
+          SyncEvent(
+            accountId,
+            syncId,
+            SyncEvent.Status.Registered,
+            Json.obj("blockHeight" -> Json.fromLong(blockHeightValue))
+          )
+        )
+      }
+    }
+  }
+
+  var unregisteredSyncId: UUID     = _
+  var unregisteredEvent: SyncEvent = _
+
+  val unregisterAccountRequest: pb.UnregisterAccountRequest =
+    pb.UnregisterAccountRequest(
+      registerBitcoinAccount.extendedKey,
+      registerBitcoinAccount.coinFamily,
+      registerBitcoinAccount.coin
+    )
 
   it should "unregister an account" in IOAssertion {
     transactor.use { db =>
-      new Service(db, conf.coins)
-        .unregisterAccountToSync(bitcoinAccount, new Metadata())
-        .map { response =>
-          UuidUtils.bytesToUuid(response.accountId) shouldBe registerAccountId
-          unregisterSyncId = UuidUtils.bytesToUuid(response.syncId)
-          unregisterSyncId should not be oneOf(None, syncId1)
-        }
+      val service = new Service(db, conf.coins)
+
+      for {
+        response <- service.unregisterAccount(unregisterAccountRequest, new Metadata())
+
+        accountId = UuidUtils.bytesToUuid(response.accountId).get
+        syncId    = UuidUtils.bytesToUuid(response.syncId).get
+
+        event <- getLastEvent(db, accountId)
+
+      } yield {
+        accountId shouldBe registeredAccountId
+        unregisteredSyncId = syncId
+        unregisteredSyncId should not be registeredSyncId
+
+        // check event
+        unregisteredEvent = event.get
+        unregisteredEvent shouldBe
+          SyncEvent(
+            accountId,
+            syncId,
+            SyncEvent.Status.Unregistered
+          )
+      }
     }
   }
 
-  it should "return the same response if already unregister" in IOAssertion {
+  it should "return the same response if already unregistered" in IOAssertion {
     transactor.use { db =>
-      new Service(db, conf.coins)
-        .unregisterAccountToSync(bitcoinAccount, new Metadata())
-        .map { response =>
-          UuidUtils.bytesToUuid(response.accountId) shouldBe registerAccountId
-          UuidUtils.bytesToUuid(response.syncId) shouldBe unregisterSyncId
-        }
+      val service = new Service(db, conf.coins)
+      for {
+        response <- service.unregisterAccount(unregisterAccountRequest, new Metadata())
+
+        accountId = UuidUtils.bytesToUuid(response.accountId).get
+        syncId    = UuidUtils.bytesToUuid(response.syncId).get
+
+        event <- getLastEvent(db, accountId)
+
+      } yield {
+        accountId shouldBe registeredAccountId
+        syncId shouldBe unregisteredSyncId
+        event shouldBe Some(unregisteredEvent)
+      }
     }
   }
+
+  private def getLastEvent(db: Transactor[IO], accountId: UUID): IO[Option[SyncEvent]] =
+    Queries.getLastSyncEvent(accountId).transact(db)
 
   private val migrateDB: IO[Unit] =
     IO {

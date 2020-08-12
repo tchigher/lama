@@ -17,7 +17,10 @@ import scala.concurrent.duration.FiniteDuration
 
 object Queries {
 
-  def fetchCandidateEvents(coinFamily: CoinFamily, coin: Coin): Stream[ConnectionIO, SyncPayload] =
+  def fetchCandidateEvents(
+      coinFamily: CoinFamily,
+      coin: Coin
+  ): Stream[ConnectionIO, CandidateSyncEvent] =
     (
       sql"""SELECT *
           FROM account_sync_status
@@ -27,7 +30,7 @@ object Queries {
           AND """
         ++ Fragments.in(fr"status", Status.candidateStatuses)
     )
-      .query[SyncPayload]
+      .query[CandidateSyncEvent]
       .stream
 
   def upsertAccountInfo(

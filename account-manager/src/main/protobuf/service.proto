@@ -6,21 +6,39 @@ option java_package = "co.ledger.lama.manager.protobuf";
 // Exposes a gRPC interface to manage synchronization of
 // account infos and transactions.
 service AccountManagerService {
-    rpc registerAccountToSync(AccountInfoRequest) returns (AccountInfoResult);
-    rpc unregisterAccountToSync(AccountInfoRequest) returns (AccountInfoResult);
+    rpc registerAccount(RegisterAccountRequest) returns (RegisterAccountResult);
+    rpc unregisterAccount(UnregisterAccountRequest) returns (UnregisterAccountResult);
 }
 
-message AccountInfoRequest {
+message RegisterAccountRequest {
     string extendedKey = 1;
     CoinFamily coinFamily = 2;
     Coin coin = 3;
     uint64 syncFrequency = 4;
+    oneof cursor {
+        BlockHeightState blockHeight = 5;
+    }
 }
 
-message AccountInfoResult {
+message BlockHeightState {
+    uint64 state = 1;
+}
+
+message UnregisterAccountRequest {
+    string extendedKey = 1;
+    CoinFamily coinFamily = 2;
+    Coin coin = 3;
+}
+
+message RegisterAccountResult {
     bytes accountId = 1;
     bytes syncId = 2;
-    uint64 syncFrequency = 3;
+    uint64 syncFrequency = 4;
+}
+
+message UnregisterAccountResult {
+    bytes accountId = 1;
+    bytes syncId = 2;
 }
 
 enum CoinFamily {

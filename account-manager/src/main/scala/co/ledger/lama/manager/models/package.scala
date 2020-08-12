@@ -24,19 +24,22 @@ package object models {
   )
 
   object SyncEvent {
-    def from(accountId: UUID, status: SyncEvent.Status): SyncEvent =
-      SyncEvent(
-        accountId,
-        UUID.randomUUID(),
-        status
-      )
+    def registered(accountId: UUID, cursor: Json): SyncEvent =
+      SyncEvent(accountId, UUID.randomUUID(), Status.Registered, cursor)
+
+    def unregistered(accountId: UUID): SyncEvent =
+      SyncEvent(accountId, UUID.randomUUID(), Status.Unregistered)
 
     implicit val encoder: Encoder[SyncEvent] = deriveEncoder[SyncEvent]
     implicit val decoder: Decoder[SyncEvent] = deriveDecoder[SyncEvent]
 
     sealed trait Status {
       def name: String
-      def isFinished: Boolean = isInstanceOf[FinalStatus]
+      def isFinished: Boolean =
+        this match {
+          case _: FinalStatus => true
+          case _              => false
+        }
     }
 
     abstract class InitialStatus(val name: String) extends Status
@@ -128,7 +131,7 @@ package object models {
       )
   }
 
-  case class SyncPayload(
+  case class CandidateSyncEvent(
       accountId: UUID,
       syncId: UUID,
       extendedKey: String,
@@ -136,9 +139,9 @@ package object models {
       payload: Json = Json.obj()
   ) extends WithRedisKey(accountId)
 
-  object SyncPayload {
-    implicit val encoder: Encoder[SyncPayload] = deriveEncoder[SyncPayload]
-    implicit val decoder: Decoder[SyncPayload] = deriveDecoder[SyncPayload]
+  object CandidateSyncEvent {
+    implicit val encoder: Encoder[CandidateSyncEvent] = deriveEncoder[CandidateSyncEvent]
+    implicit val decoder: Decoder[CandidateSyncEvent] = deriveDecoder[CandidateSyncEvent]
   }
 
   case class UpsertAccountInfoResult(accountId: UUID, syncFrequency: FiniteDuration)
