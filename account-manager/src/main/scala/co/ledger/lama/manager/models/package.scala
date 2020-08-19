@@ -4,10 +4,12 @@ import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 import cats.data.NonEmptyList
+import co.ledger.lama.manager.utils.UuidUtils
 import doobie.postgres.implicits._
 import doobie.util.Read
 import doobie.util.meta.Meta
 import io.circe.generic.semiauto._
+import io.circe.parser._
 import io.circe.{Decoder, Encoder, Json}
 import pureconfig.ConfigReader
 import pureconfig.error.CannotConvert
@@ -29,6 +31,21 @@ package object models {
 
     def unregistered(accountId: UUID): SyncEvent =
       SyncEvent(accountId, UUID.randomUUID(), Status.Unregistered)
+
+    def fromProtobuf(accountId: UUID, pb: protobuf.SyncEvent): Option[SyncEvent] =
+      for {
+        syncId  <- UuidUtils.bytesToUuid(pb.syncId)
+        status  <- Status.fromKey(pb.status)
+        payload <- parse(new String(pb.payload.toByteArray)).toOption
+
+      } yield {
+        SyncEvent(
+          accountId,
+          syncId,
+          status,
+          payload
+        )
+      }
 
     implicit val encoder: Encoder[SyncEvent] = deriveEncoder[SyncEvent]
     implicit val decoder: Decoder[SyncEvent] = deriveDecoder[SyncEvent]
@@ -144,17 +161,37 @@ package object models {
     implicit val decoder: Decoder[CandidateSyncEvent] = deriveDecoder[CandidateSyncEvent]
   }
 
-  case class UpsertAccountInfoResult(accountId: UUID, syncFrequency: FiniteDuration)
+  case class AccountInfo(id: UUID, syncFrequency: FiniteDuration)
 
-  object UpsertAccountInfoResult {
-    implicit val doobieRead: Read[UpsertAccountInfoResult] =
+  object AccountInfo {
+    implicit val doobieRead: Read[AccountInfo] =
       Read[(UUID, Long)].map {
         case (accountId, syncFrequencyInSeconds) =>
-          UpsertAccountInfoResult(
+          AccountInfo(
             accountId,
             FiniteDuration(syncFrequencyInSeconds, TimeUnit.SECONDS)
           )
       }
+  }
+
+  case class AccountIdentifier(extendedKey: String, coinFamily: CoinFamily, coin: Coin) {
+    val id: UUID = UuidUtils.fromAccountIdentifier(extendedKey, coinFamily, coin)
+  }
+
+  object AccountIdentifier {
+    def fromProtobuf(pb: protobuf.AccountInfoRequest): AccountIdentifier =
+      AccountIdentifier(
+        pb.extendedKey,
+        CoinFamily.fromProtobuf(pb.coinFamily),
+        Coin.fromProtobuf(pb.coin)
+      )
+
+    def fromProtobuf(pb: protobuf.RegisterAccountRequest): AccountIdentifier =
+      AccountIdentifier(
+        pb.extendedKey,
+        CoinFamily.fromProtobuf(pb.coinFamily),
+        Coin.fromProtobuf(pb.coin)
+      )
   }
 
 }

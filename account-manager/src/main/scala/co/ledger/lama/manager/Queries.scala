@@ -5,7 +5,6 @@ import java.util.UUID
 import co.ledger.lama.manager.models.SyncEvent.Status
 import co.ledger.lama.manager.models._
 import co.ledger.lama.manager.models.implicits._
-import co.ledger.lama.manager.utils.UuidUtils
 import doobie.Fragments
 import doobie.free.connection.ConnectionIO
 import doobie.implicits._
@@ -33,17 +32,25 @@ object Queries {
       .query[CandidateSyncEvent]
       .stream
 
+  def getAccountInfo(accountIdentifier: AccountIdentifier): ConnectionIO[Option[AccountInfo]] =
+    sql"""SELECT account_id, extract(epoch FROM sync_frequency)/60*60
+          FROM account_info
+          WHERE account_id = ${accountIdentifier.id}
+         """
+      .query[AccountInfo]
+      .option
+
   def upsertAccountInfo(
-      extendedKey: String,
-      coinFamily: CoinFamily,
-      coin: Coin,
+      accountIdentifier: AccountIdentifier,
       syncFrequency: FiniteDuration
-  ): ConnectionIO[UpsertAccountInfoResult] = {
+  ): ConnectionIO[AccountInfo] = {
+    val accountId   = accountIdentifier.id
+    val extendedKey = accountIdentifier.extendedKey
+    val coinFamily  = accountIdentifier.coinFamily
+    val coin        = accountIdentifier.coin
+
     val syncFrequencyInterval = new PGInterval()
     syncFrequencyInterval.setSeconds(syncFrequency.toSeconds.toDouble)
-
-    val accountId =
-      UuidUtils.fromAccountIdentifier(extendedKey, coinFamily, coin)
 
     sql"""INSERT INTO account_info(account_id, extended_key, coin_family, coin, sync_frequency)
           VALUES($accountId, $extendedKey, $coinFamily, $coin, $syncFrequencyInterval)
@@ -51,7 +58,7 @@ object Queries {
             DO UPDATE SET sync_frequency = $syncFrequencyInterval
           RETURNING account_id, extract(epoch FROM sync_frequency)/60*60
           """
-      .query[UpsertAccountInfoResult]
+      .query[AccountInfo]
       .unique
   }
 

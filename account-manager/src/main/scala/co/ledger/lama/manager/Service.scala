@@ -3,11 +3,17 @@ package co.ledger.lama.manager
 import java.util.concurrent.TimeUnit
 
 import cats.effect.{ConcurrentEffect, IO}
-import co.ledger.lama.manager.Exceptions.{CoinConfigurationException, MalformedProtobufException}
+import co.ledger.lama.manager.Exceptions.{
+  AccountNotFoundException,
+  CoinConfigurationException,
+  MalformedProtobufException
+}
 import co.ledger.lama.manager.config.CoinConfig
 import co.ledger.lama.manager.models.SyncEvent.Status
-import co.ledger.lama.manager.models.{Coin, CoinFamily, SyncEvent}
+import co.ledger.lama.manager.models.{AccountIdentifier, Coin, CoinFamily, SyncEvent}
 import co.ledger.lama.manager.protobuf.{
+  AccountInfoRequest,
+  AccountInfoResult,
   AccountManagerServiceFs2Grpc,
   RegisterAccountRequest,
   RegisterAccountResult,
@@ -15,6 +21,7 @@ import co.ledger.lama.manager.protobuf.{
   UnregisterAccountResult
 }
 import co.ledger.lama.manager.utils.UuidUtils
+import com.google.protobuf.ByteString
 import doobie.implicits._
 import doobie.util.transactor.Transactor
 import io.circe.Json
@@ -31,9 +38,10 @@ class Service(val db: Transactor[IO], val coinConfigs: List[CoinConfig])
       request: RegisterAccountRequest,
       ctx: Metadata
   ): IO[RegisterAccountResult] = {
-    val coinFamily = CoinFamily.fromProtobuf(request.coinFamily)
-    val coin       = Coin.fromProtobuf(request.coin)
-    val cursor     = cursorToJson(request)
+    val accountIdentifier = AccountIdentifier.fromProtobuf(request)
+    val coinFamily        = accountIdentifier.coinFamily
+    val coin              = accountIdentifier.coin
+    val cursor            = cursorToJson(request)
 
     val syncFrequencyFromRequest =
       if (request.syncFrequency > 0L)
@@ -57,12 +65,10 @@ class Service(val db: Transactor[IO], val coinConfigs: List[CoinConfig])
         accountInfo <-
           Queries
             .upsertAccountInfo(
-              request.extendedKey,
-              coinFamily,
-              coin,
+              accountIdentifier,
               syncFrequency
             )
-        accountId     = accountInfo.accountId
+        accountId     = accountInfo.id
         syncFrequency = accountInfo.syncFrequency
 
         // create then insert the registered event
@@ -129,7 +135,7 @@ class Service(val db: Transactor[IO], val coinConfigs: List[CoinConfig])
     } yield result
   }
 
-  def cursorToJson(request: protobuf.RegisterAccountRequest): Json = {
+  private def cursorToJson(request: protobuf.RegisterAccountRequest): Json = {
     if (request.cursor.isBlockHeight)
       Json.obj(
         "blockHeight" -> Json.fromLong(
@@ -140,6 +146,35 @@ class Service(val db: Transactor[IO], val coinConfigs: List[CoinConfig])
       )
     else
       Json.obj()
+  }
+
+  def getAccountInfo(request: AccountInfoRequest, ctx: Metadata): IO[AccountInfoResult] = {
+    val accountIdentifier = AccountIdentifier.fromProtobuf(request)
+
+    for {
+      accountInfo <-
+        Queries
+          .getAccountInfo(accountIdentifier)
+          .transact(db)
+           .flatMap(_.map(IO.pure).getOrElse(IO.raiseError(AccountNotFoundException(accountIdentifier))
+          }
+
+      lastSyncEvent <- Queries.getLastSyncEvent(accountInfo.id).transact(db)
+    } yield {
+      val lastSyncEventProto = lastSyncEvent.map { se =>
+        protobuf.SyncEvent(
+          UuidUtils.uuidToBytes(se.syncId),
+          se.status.name,
+          ByteString.copyFrom(se.payload.noSpaces.getBytes())
+        )
+      }
+
+      AccountInfoResult(
+        UuidUtils.uuidToBytes(accountInfo.id),
+        accountInfo.syncFrequency.toSeconds,
+        lastSyncEventProto
+      )
+    }
   }
 
 }

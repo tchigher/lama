@@ -8,6 +8,7 @@ option java_package = "co.ledger.lama.manager.protobuf";
 service AccountManagerService {
     rpc registerAccount(RegisterAccountRequest) returns (RegisterAccountResult);
     rpc unregisterAccount(UnregisterAccountRequest) returns (UnregisterAccountResult);
+    rpc getAccountInfo(AccountInfoRequest) returns (AccountInfoResult);
 }
 
 message RegisterAccountRequest {
@@ -39,6 +40,24 @@ message RegisterAccountResult {
 message UnregisterAccountResult {
     bytes accountId = 1;
     bytes syncId = 2;
+}
+
+message AccountInfoRequest {
+    string extendedKey = 1;
+    CoinFamily coinFamily = 2;
+    Coin coin = 3;
+}
+
+message AccountInfoResult {
+    bytes accountId = 1;
+    uint64 syncFrequency = 4;
+    SyncEvent lastSyncEvent = 5;
+}
+
+message SyncEvent {
+    bytes syncId = 1;
+    string status = 2;
+    bytes payload = 3;
 }
 
 enum CoinFamily {
