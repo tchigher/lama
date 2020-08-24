@@ -8,7 +8,7 @@ import com.redis.serialization.{Format, Parse}
 import com.redis.serialization.Parse.Implicits._
 import dev.profunktor.fs2rabbit.interpreter.RabbitClient
 import dev.profunktor.fs2rabbit.model.{ExchangeName, RoutingKey}
-import fs2.{Pipe, Stream}
+import fs2.Stream
 import io.circe.{Decoder, Encoder}
 import io.circe.parser.decode
 import io.circe.syntax._
@@ -22,21 +22,18 @@ abstract class WithRedisKey[K](val key: K)
   * Redis is used as a FIFO queue to guarantee the sequence.
   */
 trait Publisher[K, V <: WithRedisKey[K]] {
+  import Publisher._
 
-  // max concurrent ongoing events
+  // Max concurrent ongoing events.
   val maxOnGoingEvents: Int = 1
 
-  // stored keys
-  def pendingEventsKey(key: K): String = s"pending_events_$key"
-  def onGoingEventsKey(key: K): String = s"on_going_events_$key"
-
-  // redis client
+  // Redis client.
   def redis: RedisClient
 
-  // the inner publish function
+  // The inner publish function.
   def publish(event: V): IO[Unit]
 
-  // implicits for serializing data as json and storing it as binary in redis
+  // Implicits for serializing data as json and storing it as binary in redis.
   implicit val dec: Decoder[V]
   implicit val enc: Encoder[V]
 
@@ -56,18 +53,16 @@ trait Publisher[K, V <: WithRedisKey[K]] {
 
   // If the counter of ongoing events for the key has reached max ongoing events, add the event to the pending list.
   // Otherwise, publish and increment the counter of ongoing events.
-  def enqueue: Pipe[IO, V, Unit] =
-    _.evalMap { e =>
-      hasMaxOnGoingEvents(e.key).flatMap {
-        case true =>
-          // enqueue pending events in redis
-          rpushPendingEvents(e)
-        case false =>
-          // publish and increment the counter of ongoing events
-          publish(e)
-            .flatMap(_ => incrOnGoingEvents(e.key))
-      }.void
-    }
+  def enqueue(e: V): IO[Unit] =
+    hasMaxOnGoingEvents(e.key).flatMap {
+      case true =>
+        // enqueue pending events in redis
+        rpushPendingEvents(e)
+      case false =>
+        // publish and increment the counter of ongoing events
+        publish(e)
+          .flatMap(_ => incrOnGoingEvents(e.key))
+    }.void
 
   // Remove the top pending event of a key and take the next pending event.
   // If next pending event exists, publish it.
@@ -84,19 +79,19 @@ trait Publisher[K, V <: WithRedisKey[K]] {
       }
     } yield result
 
-  // check if the counter of ongoing events has reached the max.
+  // Check if the counter of ongoing events has reached the max.
   private def hasMaxOnGoingEvents(key: K): IO[Boolean] =
-    IO(redis.get[Int](onGoingEventsKey(key)).exists(_ >= maxOnGoingEvents))
+    IO(redis.get[Int](onGoingEventsCounterKey(key)).exists(_ >= maxOnGoingEvents))
 
   // https://redis.io/commands/incr
   // Increment the counter of ongoing events for a key and return the value after.
   private def incrOnGoingEvents(key: K): IO[Long] =
-    IO.fromOption(redis.incr(onGoingEventsKey(key)))(RedisUnexpectedException)
+    IO.fromOption(redis.incr(onGoingEventsCounterKey(key)))(RedisUnexpectedException)
 
   /// https://redis.io/commands/decr
   // Decrement the counter of ongoing events for a key and return the value after.
   private def decrOnGoingEvents(key: K): IO[Long] =
-    IO.fromOption(redis.decr(onGoingEventsKey(key)))(RedisUnexpectedException)
+    IO.fromOption(redis.decr(onGoingEventsCounterKey(key)))(RedisUnexpectedException)
 
   // https://redis.io/commands/rpush
   // Add an event at the last and return the length after.
@@ -108,6 +103,12 @@ trait Publisher[K, V <: WithRedisKey[K]] {
   private def lpopPendingEvents(key: K): IO[Option[V]] =
     IO(redis.lpop[V](pendingEventsKey(key)))
 
+}
+
+object Publisher {
+  // Stored keys.
+  def onGoingEventsCounterKey[K](key: K): String = s"on_going_events_counter_$key"
+  def pendingEventsKey[K](key: K): String        = s"pending_events_$key"
 }
 
 class RabbitPublisher[K, V <: WithRedisKey[K]](

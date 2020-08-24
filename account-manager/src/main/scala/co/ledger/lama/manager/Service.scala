@@ -25,6 +25,7 @@ import com.google.protobuf.ByteString
 import doobie.implicits._
 import doobie.util.transactor.Transactor
 import io.circe.Json
+import io.circe.syntax._
 import io.grpc.Metadata
 
 import scala.concurrent.duration.FiniteDuration
@@ -50,8 +51,8 @@ class Service(val db: Transactor[IO], val coinConfigs: List[CoinConfig])
         None
 
     for {
-      // get the sync frequency from the request
-      // or fallback to the default one from the coin configuration
+      // Get the sync frequency from the request
+      // or fallback to the default one from the coin configuration.
       syncFrequency <- IO.fromOption {
         syncFrequencyFromRequest orElse
           coinConfigs
@@ -59,9 +60,9 @@ class Service(val db: Transactor[IO], val coinConfigs: List[CoinConfig])
             .map(_.syncFrequency)
       }(CoinConfigurationException(coinFamily, coin))
 
-      // build queries
+      // Build queries.
       queries = for {
-        // upsert the account info
+        // Upsert the account info.
         accountInfo <-
           Queries
             .upsertAccountInfo(
@@ -71,14 +72,14 @@ class Service(val db: Transactor[IO], val coinConfigs: List[CoinConfig])
         accountId     = accountInfo.id
         syncFrequency = accountInfo.syncFrequency
 
-        // create then insert the registered event
-        syncEvent = SyncEvent.registered(accountId, cursor)
+        // Create then insert the registered event.
+        syncEvent = SyncEvent.registered(accountIdentifier, cursor)
         _ <- Queries.insertSyncEvent(syncEvent)
 
       } yield (accountId, syncEvent.syncId, syncFrequency)
 
       response <-
-        // run queries and return an sync event result
+        // Run queries and return an sync event result.
         queries
           .transact(db)
           .map {
@@ -96,8 +97,8 @@ class Service(val db: Transactor[IO], val coinConfigs: List[CoinConfig])
       request: UnregisterAccountRequest,
       ctx: Metadata
   ): IO[UnregisterAccountResult] = {
-    val accountId =
-      UuidUtils.fromAccountIdentifier(
+    val accountIdentifier =
+      AccountIdentifier(
         request.extendedKey,
         CoinFamily.fromProtobuf(request.coinFamily),
         Coin.fromProtobuf(request.coin)
@@ -106,7 +107,7 @@ class Service(val db: Transactor[IO], val coinConfigs: List[CoinConfig])
     for {
       existing <-
         Queries
-          .getLastSyncEvent(accountId)
+          .getLastSyncEvent(accountIdentifier.id)
           .transact(db)
           .map(_.filter(e => e.status == Status.Unregistered || e.status == Status.Deleted))
 
@@ -120,8 +121,8 @@ class Service(val db: Transactor[IO], val coinConfigs: List[CoinConfig])
           )
 
         case _ =>
-          // create then insert an unregistered event
-          val event = SyncEvent.unregistered(accountId)
+          // Create then insert an unregistered event.
+          val event = SyncEvent.unregistered(accountIdentifier)
           Queries
             .insertSyncEvent(event)
             .transact(db)
@@ -156,7 +157,8 @@ class Service(val db: Transactor[IO], val coinConfigs: List[CoinConfig])
         Queries
           .getAccountInfo(accountIdentifier)
           .transact(db)
-           .flatMap(_.map(IO.pure).getOrElse(IO.raiseError(AccountNotFoundException(accountIdentifier))
+          .flatMap {
+            _.map(IO.pure).getOrElse(IO.raiseError(AccountNotFoundException(accountIdentifier)))
           }
 
       lastSyncEvent <- Queries.getLastSyncEvent(accountInfo.id).transact(db)
@@ -165,7 +167,7 @@ class Service(val db: Transactor[IO], val coinConfigs: List[CoinConfig])
         protobuf.SyncEvent(
           UuidUtils.uuidToBytes(se.syncId),
           se.status.name,
-          ByteString.copyFrom(se.payload.noSpaces.getBytes())
+          ByteString.copyFrom(se.payload.asJson.noSpaces.getBytes())
         )
       }
 

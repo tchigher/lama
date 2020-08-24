@@ -26,7 +26,9 @@ scalapbCodeGeneratorOptions += CodeGeneratorOption.FlatPackage
 // Projects
 lazy val root = (project in file("."))
   .enablePlugins(BuildInfoPlugin)
+  .configs(IntegrationTest)
   .settings(
+    Defaults.itSettings,
     organization := "co.ledger",
     name := "lama-account-manager",
     version := "0.0.1-SNAPSHOT",

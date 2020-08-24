@@ -43,10 +43,10 @@ object Dependencies extends DependencyBuilders with LibraryManagementSyntax {
   val otjPgEmbeddedVersion = "0.13.3"
   val embeddedRedisVersion = "0.7.3"
   val test: Seq[ModuleID] = Seq(
-    "org.scalatest"           %% "scalatest"        % scalaTestVersion     % Test,
-    "org.scalacheck"          %% "scalacheck"       % scalaCheckVersion    % Test,
-    "org.scalatestplus"       %% "scalacheck-1-14"  % scalaTestPlusVersion % Test,
-    "org.tpolecat"            %% "doobie-scalatest" % doobieVersion        % Test,
+    "org.scalatest"           %% "scalatest"        % scalaTestVersion     % "it, test",
+    "org.scalacheck"          %% "scalacheck"       % scalaCheckVersion    % "it, test",
+    "org.scalatestplus"       %% "scalacheck-1-14"  % scalaTestPlusVersion % "it, test",
+    "org.tpolecat"            %% "doobie-scalatest" % doobieVersion        % "it, test",
     "com.opentable.components" % "otj-pg-embedded"  % otjPgEmbeddedVersion % Test,
     "it.ozimov"                % "embedded-redis"   % embeddedRedisVersion % Test
   )

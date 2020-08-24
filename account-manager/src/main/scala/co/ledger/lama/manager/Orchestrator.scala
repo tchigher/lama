@@ -1,40 +1,40 @@
 package co.ledger.lama.manager
 
-import cats.effect.{Concurrent, IO, Timer}
-import co.ledger.lama.manager.config.OrchestratorConfig
+import cats.effect.{Concurrent, ContextShift, IO, Timer}
+import cats.implicits._
+import co.ledger.lama.manager.config.{CoinConfig, OrchestratorConfig}
+import co.ledger.lama.manager.utils.RabbitUtils
 import com.redis.RedisClient
 import dev.profunktor.fs2rabbit.interpreter.RabbitClient
+import dev.profunktor.fs2rabbit.model.ExchangeType
 import doobie.util.transactor.Transactor
 import fs2.Stream
+
 import scala.concurrent.duration._
 
 trait Orchestrator {
 
-  // tasks which have candidates and reports streams
-  val tasks: List[EventTask]
+  val tasks: List[SyncEventTask]
 
   // duration to awake every 'd' candidates stream
   val awakeEvery: FiniteDuration = 5.seconds
 
-  def run(n: Option[Long] = None)(implicit c: Concurrent[IO], t: Timer[IO]): Stream[IO, Unit] = {
+  def run(
+      stopAtNbTick: Option[Long] = None
+  )(implicit c: Concurrent[IO], t: Timer[IO]): Stream[IO, Unit] =
+    Stream
+      .emits(tasks)
+      .map { task =>
+        val publishPipeline = task.publishEvents(awakeEvery, stopAtNbTick)
+        val reportPipeline  = task.reportEvents
+        val triggerPipelune = task.trigger(awakeEvery)
 
-    val candidateEventsPipeline =
-      Stream
-        .emits(tasks)                     // emit tasks
-        .map(_.candidates(awakeEvery, n)) // for each, call candidates stream
-        .parJoinUnbounded                 // race all inner streams simultaneously
-
-    val reportsFinishedEventsPipeline =
-      Stream
-        .emits(tasks)     // emit tasks
-        .map(_.reports)   // for each, call reports stream
-        .parJoinUnbounded // race all inner streams simultaneously
-
-    // race the stream of candidate events
-    // and also, at the same, race the stream of report events.
-    candidateEventsPipeline
-      .concurrently(reportsFinishedEventsPipeline)
-  }
+        // Race all inner streams simultaneously.
+        publishPipeline
+          .concurrently(reportPipeline)
+          .concurrently(triggerPipelune)
+      }
+      .parJoinUnbounded
 
 }
 
@@ -43,11 +43,46 @@ class CoinOrchestrator(
     val db: Transactor[IO],
     val rabbit: RabbitClient[IO],
     val redis: RedisClient
-) extends Orchestrator {
+)(implicit cs: ContextShift[IO])
+    extends Orchestrator {
 
-  val tasks: List[CoinTask] =
-    conf.coins.map(
-      new CoinTask(conf.workerExchangeName, conf.eventsExchangeName, _, db, rabbit, redis)
+  // Declare rabbitmq exchanges and bindings used by workers and the orchestrator.
+  private def declareExchangesBindings(coinConf: CoinConfig): IO[Unit] = {
+    val workerExchangeName = conf.workerExchangeName
+    val eventsExchangeName = conf.eventsExchangeName
+
+    val exchanges = List(
+      (workerExchangeName, ExchangeType.Topic),
+      (eventsExchangeName, ExchangeType.Topic)
     )
+
+    val bindings = List(
+      (eventsExchangeName, coinConf.routingKey, coinConf.queueName(eventsExchangeName)),
+      (workerExchangeName, coinConf.routingKey, coinConf.queueName(workerExchangeName))
+    )
+
+    RabbitUtils.declareExchanges(rabbit, exchanges) *>
+      RabbitUtils.declareBindings(rabbit, bindings)
+  }
+
+  val tasks: List[CoinSyncEventTask] = {
+    // Declare exchanges and bindings immediately.
+    conf.coins
+      .map(declareExchangesBindings)
+      .parSequence
+      .unsafeRunSync()
+
+    conf.coins
+      .map { coinConf =>
+        new CoinSyncEventTask(
+          conf.workerExchangeName,
+          conf.eventsExchangeName,
+          coinConf,
+          db,
+          rabbit,
+          redis
+        )
+      }
+  }
 
 }

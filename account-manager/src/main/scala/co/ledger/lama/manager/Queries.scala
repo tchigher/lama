@@ -4,7 +4,6 @@ import java.util.UUID
 
 import co.ledger.lama.manager.models.SyncEvent.Status
 import co.ledger.lama.manager.models._
-import co.ledger.lama.manager.models.implicits._
 import doobie.Fragments
 import doobie.free.connection.ConnectionIO
 import doobie.implicits._
@@ -16,20 +15,35 @@ import scala.concurrent.duration.FiniteDuration
 
 object Queries {
 
-  def fetchCandidateEvents(
+  def fetchPublishableEvents(
       coinFamily: CoinFamily,
       coin: Coin
-  ): Stream[ConnectionIO, CandidateSyncEvent] =
+  ): Stream[ConnectionIO, SyncEvent] =
     (
-      sql"""SELECT *
+      sql"""SELECT account_id, sync_id, status, payload
+          FROM account_sync_status
+          WHERE coin_family = $coinFamily
+          AND coin = $coin
+          AND """
+        ++ Fragments.in(fr"status", Status.sendableStatuses)
+    )
+      .query[SyncEvent]
+      .stream
+
+  def fetchTriggerableEvents(
+      coinFamily: CoinFamily,
+      coin: Coin
+  ): Stream[ConnectionIO, SyncEvent] =
+    (
+      sql"""SELECT account_id, sync_id, status, payload
           FROM account_sync_status
           WHERE updated + sync_frequency < CURRENT_TIMESTAMP
           AND coin_family = $coinFamily
           AND coin = $coin
           AND """
-        ++ Fragments.in(fr"status", Status.candidateStatuses)
+        ++ Fragments.in(fr"status", Status.triggerableStatuses)
     )
-      .query[CandidateSyncEvent]
+      .query[SyncEvent]
       .stream
 
   def getAccountInfo(accountIdentifier: AccountIdentifier): ConnectionIO[Option[AccountInfo]] =
@@ -76,4 +90,11 @@ object Queries {
       .query[SyncEvent]
       .option
 
+  def getSyncEvents(accountId: UUID): Stream[ConnectionIO, SyncEvent] =
+    sql"""SELECT account_id, sync_id, status, payload
+          FROM account_sync_event
+          WHERE account_id = $accountId
+          """
+      .query[SyncEvent]
+      .stream
 }

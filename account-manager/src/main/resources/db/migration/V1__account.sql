@@ -1,9 +1,11 @@
 CREATE TYPE sync_status as ENUM(
     'registered',
     'unregistered',
+    'published',
     'synchronized',
+    'sync_failed',
     'deleted',
-    'failed'
+    'delete_failed'
 );
 
 CREATE TYPE coin_family as ENUM(

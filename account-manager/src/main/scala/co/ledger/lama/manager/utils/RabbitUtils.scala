@@ -13,6 +13,7 @@ import dev.profunktor.fs2rabbit.interpreter.RabbitClient
 import dev.profunktor.fs2rabbit.model._
 import fs2.Stream
 import io.circe.{Decoder, Encoder}
+import io.circe.parser._
 import io.circe.syntax._
 
 object RabbitUtils {
@@ -25,24 +26,49 @@ object RabbitUtils {
       .map(Blocker.liftExecutorService)
       .evalMap(RabbitClient[IO](conf, _))
 
+  def declareExchanges(
+      R: RabbitClient[IO],
+      exchanges: List[(ExchangeName, ExchangeType)]
+  ): IO[Unit] =
+    R.createConnectionChannel.use { implicit channel =>
+      exchanges
+        .map {
+          case (exchangeName, exchangeType) =>
+            R.declareExchange(exchangeName, exchangeType)
+        }
+        .sequence
+        .void
+    }
+
+  def declareBindings(
+      R: RabbitClient[IO],
+      bindings: List[(ExchangeName, RoutingKey, QueueName)]
+  ): IO[Unit] =
+    R.createConnectionChannel.use { implicit channel =>
+      bindings
+        .map {
+          case (exchangeName, routingKey, queueName) =>
+            R.declareQueue(DeclarationQueueConfig.default(queueName)) *>
+              R.bindQueue(queueName, exchangeName, routingKey)
+        }
+        .sequence
+        .void
+    }
+
   def createAutoAckConsumer[A](
       R: RabbitClient[IO],
-      exchangeName: ExchangeName,
-      routingKey: RoutingKey,
       queueName: QueueName
   )(implicit d: Decoder[A]): Stream[IO, A] =
     Stream
       .resource(R.createConnectionChannel)
       .evalMap { implicit channel =>
-        for {
-          _        <- R.declareQueue(DeclarationQueueConfig.default(queueName))
-          _        <- R.declareExchange(exchangeName, ExchangeType.Topic)
-          _        <- R.bindQueue(queueName, exchangeName, routingKey)
-          consumer <- R.createAutoAckConsumer[String](queueName)
-        } yield consumer
+        R.createAutoAckConsumer[String](queueName)
       }
       .flatten
-      .evalMap(message => IO.fromEither(message.payload.asJson.as[A]))
+      .evalMap { message =>
+        val parsed = parse(message.payload).flatMap(_.as[A])
+        IO.fromEither(parsed)
+      }
 
   def createPublisher[A](
       R: RabbitClient[IO],

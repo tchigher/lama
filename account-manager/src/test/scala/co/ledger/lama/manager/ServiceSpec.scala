@@ -5,7 +5,7 @@ import java.util.UUID
 import cats.effect.{Blocker, ContextShift, IO, Resource}
 import co.ledger.lama.manager.Exceptions.AccountNotFoundException
 import co.ledger.lama.manager.config.CoinConfig
-import co.ledger.lama.manager.models.{Coin, CoinFamily, SyncEvent}
+import co.ledger.lama.manager.models.{AccountIdentifier, Coin, CoinFamily, SyncEvent}
 import co.ledger.lama.manager.protobuf.{AccountInfoRequest, BlockHeightState}
 import co.ledger.lama.manager.utils.UuidUtils
 import co.ledger.lama.manager.{protobuf => pb}
@@ -60,6 +60,9 @@ class ServiceSpec extends AnyFlatSpecLike with Matchers with BeforeAndAfterAll {
       registerBitcoinAccount.coin
     )
 
+  val accountIdentifier: AccountIdentifier =
+    AccountIdentifier(registerBitcoinAccount.extendedKey, CoinFamily.Bitcoin, Coin.Btc)
+
   it should "register a new account" in IOAssertion {
     transactor.use { db =>
       val service                     = new Service(db, conf.coins)
@@ -89,7 +92,14 @@ class ServiceSpec extends AnyFlatSpecLike with Matchers with BeforeAndAfterAll {
         syncFrequency shouldBe defaultBitcoinSyncFrequency
 
         // check event
-        event shouldBe Some(SyncEvent(accountId, syncId, SyncEvent.Status.Registered))
+        event shouldBe Some(
+          SyncEvent(
+            accountId,
+            syncId,
+            SyncEvent.Status.Registered,
+            SyncEvent.Payload(accountIdentifier)
+          )
+        )
       }
     }
   }
@@ -119,12 +129,19 @@ class ServiceSpec extends AnyFlatSpecLike with Matchers with BeforeAndAfterAll {
         syncFrequency shouldBe updatedSyncFrequency
 
         // check event
-        event shouldBe Some(SyncEvent(accountId, syncId, SyncEvent.Status.Registered))
+        event shouldBe Some(
+          SyncEvent(
+            accountId,
+            syncId,
+            SyncEvent.Status.Registered,
+            SyncEvent.Payload(accountIdentifier)
+          )
+        )
       }
     }
   }
 
-  it should "register an account from a blockHeight cursor" in IOAssertion {
+  it should "register an account with a cursor state" in IOAssertion {
     transactor.use { db =>
       val service          = new Service(db, conf.coins)
       val blockHeightValue = 10L
@@ -153,7 +170,10 @@ class ServiceSpec extends AnyFlatSpecLike with Matchers with BeforeAndAfterAll {
             accountId,
             syncId,
             SyncEvent.Status.Registered,
-            Json.obj("blockHeight" -> Json.fromLong(blockHeightValue))
+            SyncEvent.Payload(
+              accountIdentifier,
+              Json.obj("blockHeight" -> Json.fromLong(blockHeightValue))
+            )
           )
         )
       }
@@ -192,7 +212,8 @@ class ServiceSpec extends AnyFlatSpecLike with Matchers with BeforeAndAfterAll {
           SyncEvent(
             accountId,
             syncId,
-            SyncEvent.Status.Unregistered
+            SyncEvent.Status.Unregistered,
+            SyncEvent.Payload(accountIdentifier)
           )
       }
     }

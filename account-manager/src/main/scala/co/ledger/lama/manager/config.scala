@@ -2,7 +2,7 @@ package co.ledger.lama.manager
 
 import co.ledger.lama.manager.models.{Coin, CoinFamily}
 import dev.profunktor.fs2rabbit.config.{Fs2RabbitConfig, Fs2RabbitNodeConfig}
-import dev.profunktor.fs2rabbit.model.ExchangeName
+import dev.profunktor.fs2rabbit.model.{ExchangeName, QueueName, RoutingKey}
 import pureconfig.ConfigReader
 import pureconfig.generic.semiauto._
 import pureconfig.module.cats._
@@ -72,5 +72,10 @@ object config {
       coinFamily: CoinFamily,
       coin: Coin,
       syncFrequency: FiniteDuration
-  )
+  ) {
+    val routingKey: RoutingKey = RoutingKey(s"${coinFamily.name}.${coin.name}")
+
+    def queueName(exchangeName: ExchangeName): QueueName =
+      QueueName(s"${exchangeName.value}.${routingKey.value}")
+  }
 }

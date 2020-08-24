@@ -32,7 +32,7 @@ class PublisherSpec extends AnyFlatSpecLike with Matchers with Inspectors with B
     it should s" have $maxOnGoingEvents published events and $countPendingEvents pending events" in IOAssertion {
       Stream
         .emits(events)
-        .through(publisher.enqueue)
+        .evalMap(publisher.enqueue)
         .compile
         .drain
         .map { _ =>
@@ -50,7 +50,7 @@ class PublisherSpec extends AnyFlatSpecLike with Matchers with Inspectors with B
     it should s"publish events $maxOnGoingEvents by $maxOnGoingEvents" in IOAssertion {
       Stream
         .emits(events)
-        .through(publisher.enqueue)
+        .evalMap(publisher.enqueue)
         .zipWithIndex
         .evalMap {
           case (_, index) =>
@@ -101,6 +101,7 @@ class TestPublisher(
     val enc: Encoder[TestEvent],
     val dec: Decoder[TestEvent]
 ) extends Publisher[UUID, TestEvent] {
+  import Publisher._
 
   val key: UUID = UUID.randomUUID()
 

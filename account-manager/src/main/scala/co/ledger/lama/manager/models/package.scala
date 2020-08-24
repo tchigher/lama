@@ -4,13 +4,15 @@ import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 import cats.data.NonEmptyList
+import co.ledger.lama.manager.models.implicits._
 import co.ledger.lama.manager.utils.UuidUtils
 import doobie.postgres.implicits._
-import doobie.util.Read
+import doobie.util.{Get, Put, Read}
 import doobie.util.meta.Meta
 import io.circe.generic.semiauto._
 import io.circe.parser._
 import io.circe.{Decoder, Encoder, Json}
+import io.circe.syntax._
 import pureconfig.ConfigReader
 import pureconfig.error.CannotConvert
 
@@ -22,22 +24,24 @@ package object models {
       accountId: UUID,
       syncId: UUID,
       status: SyncEvent.Status,
-      payload: Json = Json.obj()
-  )
+      payload: SyncEvent.Payload
+  ) extends WithRedisKey(accountId)
 
   object SyncEvent {
-    def registered(accountId: UUID, cursor: Json): SyncEvent =
-      SyncEvent(accountId, UUID.randomUUID(), Status.Registered, cursor)
+    def registered(account: AccountIdentifier, cursor: Json): SyncEvent =
+      SyncEvent(account.id, UUID.randomUUID(), Status.Registered, Payload(account, cursor))
 
-    def unregistered(accountId: UUID): SyncEvent =
-      SyncEvent(accountId, UUID.randomUUID(), Status.Unregistered)
+    def unregistered(account: AccountIdentifier): SyncEvent =
+      SyncEvent(account.id, UUID.randomUUID(), Status.Unregistered, Payload(account))
+
+    def nextFromTriggerable(e: SyncEvent, trigger: TriggerableStatus): SyncEvent =
+      SyncEvent(e.accountId, UUID.randomUUID(), trigger.nextStatus, e.payload)
 
     def fromProtobuf(accountId: UUID, pb: protobuf.SyncEvent): Option[SyncEvent] =
       for {
         syncId  <- UuidUtils.bytesToUuid(pb.syncId)
         status  <- Status.fromKey(pb.status)
-        payload <- parse(new String(pb.payload.toByteArray)).toOption
-
+        payload <- parse(new String(pb.payload.toByteArray)).flatMap(_.as[Payload]).toOption
       } yield {
         SyncEvent(
           accountId,
@@ -52,43 +56,61 @@ package object models {
 
     sealed trait Status {
       def name: String
-      def isFinished: Boolean =
-        this match {
-          case _: FinalStatus => true
-          case _              => false
-        }
     }
 
-    abstract class InitialStatus(val name: String) extends Status
-    abstract class FinalStatus(val name: String)   extends Status
+    sealed trait TriggerableStatus extends Status {
+      val nextStatus: PublishableStatus
+    }
+
+    abstract class PublishableStatus(val name: String) extends Status
+    abstract class ReportableStatus(val name: String)  extends Status
 
     object Status {
-      // account available for sync
-      case object Registered extends InitialStatus("registered")
+      // Registered event sent to worker for sync.
+      case object Registered extends PublishableStatus("registered")
 
-      // account unavailable for sync
-      case object Unregistered extends InitialStatus("unregistered")
+      // Unregistered event sent to worker for delete data.
+      case object Unregistered extends PublishableStatus("unregistered")
 
-      // account sync succeed
-      case object Synchronized extends FinalStatus("synchronized")
+      // Published event.
+      case object Published extends Status {
+        val name: String = "published"
+      }
 
-      // account deletion succeed
-      case object Deleted extends FinalStatus("deleted")
+      // Successful sync event reported by worker.
+      case object Synchronized extends ReportableStatus("synchronized") with TriggerableStatus {
+        val nextStatus: PublishableStatus = Registered
+      }
 
-      // account sync/delete failed
-      case object Failed extends FinalStatus("failed")
+      // Failed sync event reported by worker.
+      case object SyncFailed extends ReportableStatus("sync_failed") with TriggerableStatus {
+        val nextStatus: PublishableStatus = Registered
+      }
 
-      val candidateStatuses: NonEmptyList[Status] =
-        NonEmptyList.of(Registered, Synchronized, Failed, Unregistered)
+      // Successful delete event reported by worker.
+      case object Deleted extends ReportableStatus("deleted")
+
+      // Failed delete event reported by worker.
+      case object DeleteFailed extends ReportableStatus("delete_failed") with TriggerableStatus {
+        val nextStatus: PublishableStatus = Unregistered
+      }
 
       val all: Map[String, Status] =
         Map(
           Registered.name   -> Registered,
           Unregistered.name -> Unregistered,
+          Published.name    -> Published,
           Synchronized.name -> Synchronized,
+          SyncFailed.name   -> SyncFailed,
           Deleted.name      -> Deleted,
-          Failed.name       -> Failed
+          DeleteFailed.name -> DeleteFailed
         )
+
+      val sendableStatuses: NonEmptyList[Status] =
+        NonEmptyList.fromListUnsafe(all.values.filter(_.isInstanceOf[PublishableStatus]).toList)
+
+      val triggerableStatuses: NonEmptyList[Status] =
+        NonEmptyList.fromListUnsafe(all.values.filter(_.isInstanceOf[TriggerableStatus]).toList)
 
       def fromKey(key: String): Option[Status] = all.get(key)
 
@@ -99,6 +121,16 @@ package object models {
 
       implicit val meta: Meta[Status] =
         pgEnumStringOpt("sync_status", Status.fromKey, _.name)
+    }
+
+    case class Payload(account: AccountIdentifier, data: Json = Json.obj())
+
+    object Payload {
+      implicit val encoder: Encoder[Payload] = deriveEncoder[Payload]
+      implicit val decoder: Decoder[Payload] = deriveDecoder[Payload]
+
+      implicit val doobieGet: Get[Payload] = jsonMeta.get.temap(_.as[Payload].left.map(_.message))
+      implicit val doobiePut: Put[Payload] = jsonMeta.put.contramap[Payload](_.asJson)
     }
   }
 
@@ -115,13 +147,17 @@ package object models {
       fromKey(pb.name).get
 
     implicit val meta: Meta[CoinFamily] =
-      pgEnumStringOpt("coin_family", CoinFamily.fromKey, _.name)
+      pgEnumStringOpt("coin_family", fromKey, _.name)
 
-    implicit val encoder: Encoder[CoinFamily] = Encoder.encodeString.contramap(_.name)
+    implicit val encoder: Encoder[CoinFamily] =
+      Encoder.encodeString.contramap(_.name)
+
+    implicit val decoder: Decoder[CoinFamily] =
+      Decoder.decodeString.emap(fromKey(_).toRight("Could not decode as coin family"))
 
     implicit val configReader: ConfigReader[CoinFamily] =
       ConfigReader.fromString(str =>
-        CoinFamily.fromKey(str).toRight(CannotConvert(str, "CoinFamily", "unknown"))
+        fromKey(str).toRight(CannotConvert(str, "CoinFamily", "unknown"))
       )
   }
 
@@ -138,27 +174,16 @@ package object models {
       fromKey(pb.name).get
 
     implicit val meta: Meta[Coin] =
-      pgEnumStringOpt("coin", Coin.fromKey, _.name)
+      pgEnumStringOpt("coin", fromKey, _.name)
 
-    implicit val encoder: Encoder[Coin] = Encoder.encodeString.contramap(_.name)
+    implicit val encoder: Encoder[Coin] =
+      Encoder.encodeString.contramap(_.name)
+
+    implicit val decoder: Decoder[Coin] =
+      Decoder.decodeString.emap(fromKey(_).toRight("Could not decode as coin"))
 
     implicit val configReader: ConfigReader[Coin] =
-      ConfigReader.fromString(str =>
-        Coin.fromKey(str).toRight(CannotConvert(str, "Coin", "unknown"))
-      )
-  }
-
-  case class CandidateSyncEvent(
-      accountId: UUID,
-      syncId: UUID,
-      extendedKey: String,
-      status: SyncEvent.Status,
-      payload: Json = Json.obj()
-  ) extends WithRedisKey(accountId)
-
-  object CandidateSyncEvent {
-    implicit val encoder: Encoder[CandidateSyncEvent] = deriveEncoder[CandidateSyncEvent]
-    implicit val decoder: Decoder[CandidateSyncEvent] = deriveDecoder[CandidateSyncEvent]
+      ConfigReader.fromString(str => fromKey(str).toRight(CannotConvert(str, "Coin", "unknown")))
   }
 
   case class AccountInfo(id: UUID, syncFrequency: FiniteDuration)
@@ -179,6 +204,9 @@ package object models {
   }
 
   object AccountIdentifier {
+    implicit val encoder: Encoder[AccountIdentifier] = deriveEncoder[AccountIdentifier]
+    implicit val decoder: Decoder[AccountIdentifier] = deriveDecoder[AccountIdentifier]
+
     def fromProtobuf(pb: protobuf.AccountInfoRequest): AccountIdentifier =
       AccountIdentifier(
         pb.extendedKey,
