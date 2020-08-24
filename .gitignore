@@ -1,8 +1,5 @@
 .metals
 .bloop
-account-manager/target
-account-manager/project/project
-account-manager/project/target
 .idea
 assembly
 .sbt
