@@ -31,7 +31,7 @@ class AccountManagerIT extends AnyFlatSpecLike with Matchers with TestResources 
         val worker = new SimpleWorker(
           rabbitClient,
           conf.orchestrator.workerExchangeName,
-          conf.orchestrator.eventsExchangeName,
+          conf.orchestrator.lamaEventsExchangeName,
           conf.orchestrator.coins.head
         )
 

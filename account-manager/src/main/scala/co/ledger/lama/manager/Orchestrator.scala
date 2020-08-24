@@ -49,7 +49,7 @@ class CoinOrchestrator(
   // Declare rabbitmq exchanges and bindings used by workers and the orchestrator.
   private def declareExchangesBindings(coinConf: CoinConfig): IO[Unit] = {
     val workerExchangeName = conf.workerExchangeName
-    val eventsExchangeName = conf.eventsExchangeName
+    val eventsExchangeName = conf.lamaEventsExchangeName
 
     val exchanges = List(
       (workerExchangeName, ExchangeType.Topic),
@@ -76,7 +76,7 @@ class CoinOrchestrator(
       .map { coinConf =>
         new CoinSyncEventTask(
           conf.workerExchangeName,
-          conf.eventsExchangeName,
+          conf.lamaEventsExchangeName,
           coinConf,
           db,
           rabbit,
