@@ -1,0 +1,146 @@
+syntax = "proto3";
+option go_package = ".;protobuf";
+option java_package = "co.ledger.lama.bitcoin.protobuf";
+
+service AccountService {
+  rpc GetAccount(AccountId) returns (GetAccountResponse) {}
+  rpc DeleteAccount(AccountId) returns (DeleteAccountResponse) {}
+  rpc GetAccountState(AccountId) returns (GetAccountStateResponse) {}
+  rpc GetAccountBalances(Empty) returns (GetAccountBalancesResponse) {}
+  rpc GetObservableAddresses(GetObservableAddressesRequest) returns (Addresses) {}
+  rpc GetFreshAddress(AccountId) returns (Addresses) {}
+  rpc GetUtxo(AccountId) returns (UTXOs) {}
+  rpc BuildTransaction(BuildTransactionRequest) returns (BuildTransactionResponse) {}
+  rpc SendTransaction(SendTransactionRequest) returns (SendTransactionResponse) {}
+  rpc GetAccountOperations(AccountId) returns (Operations) {}
+  rpc GetAccountBalanceHistory(GetAccountBalanceHistoryRequest) returns (GetAccountBalanceHistoryResponse) {}
+}
+
+message AccountId {
+  string account_id = 1;
+}
+
+message GetAccountResponse {
+  string account_id = 1;
+  string currency = 2;
+  string extended_public_key = 3;
+  string keychain = 4;
+  string chain = 5;
+}
+
+message DeleteAccountResponse {
+  bool deleted = 1;
+}
+
+message GetAccountStateResponse {
+  string balance = 1;
+  int32 operation_received = 2;
+  int32 operation_sent = 3;
+}
+
+message Empty {}
+
+message GetAccountBalancesResponse {
+  message AccountBalance {
+    string account_id = 1;
+    string balance = 2;
+  }
+  repeated AccountBalance balances = 1;
+}
+
+message GetObservableAddressesRequest {
+  string account_id = 1;
+  // Starting address index to derive, nullable
+  int32 from_index = 2;
+  // Starting address index to derive, nullable
+  int32 to_index = 3;
+}
+
+message Addresses {
+  message Address {
+    string address = 1;
+    string address_derivation_path = 2;
+  }
+  repeated Address addresses = 1;
+}
+
+message UTXOs {
+  message UTXO {
+    bytes hash = 1;
+    int32 output_index = 2;
+    string address = 3;
+    int32 height = 4;
+    int32 confirmations = 5;
+    string amount = 6;
+  }
+  repeated UTXO utxos = 1;
+}
+
+message BuildTransactionRequest {
+  repeated string recipients = 1;
+  // nullable
+  string fees_per_byte = 2;
+  string amount = 3;
+  string utxo_picking_strategy = 4;
+}
+
+message BuildTransactionResponse {
+  bytes hex = 1;
+  string fees = 2;
+  int32 min_estimated_size = 3;
+  int32 max_estimated_size = 4;
+}
+
+message SendTransactionRequest {
+  bytes hex = 1;
+  repeated bytes signatures = 2;
+  repeated string address_derivation_paths = 3;
+}
+
+message SendTransactionResponse {
+  bytes transaction_hash = 1;
+}
+
+message Operations {
+  message Operation {
+    string uid = 1;
+    int32 confirmations = 2;
+    int32 block_height = 3;
+    bytes block_hash = 4;
+    int64 timestamp = 5;
+    enum Type {
+      SEND = 0;
+      RECEIVE = 1;
+    }
+    Type type = 6;
+    repeated string senders = 7;
+    repeated string recipients = 8;
+    repeated string self_recipients = 9;
+    string status = 10;
+    string error = 11;
+  }
+  repeated Operation operations = 1;
+}
+
+message GetAccountBalanceHistoryRequest {
+  string account_id = 1;
+  int64 start_timestamp = 2;
+  int64 end_timestamp = 3;
+  enum TimeInterval {
+    HOUR = 0;
+    DAY = 1;
+    WEEK = 2;
+    MONTH = 3;
+    YEAR = 4;
+  }
+  TimeInterval time_interval = 4;
+}
+
+message GetAccountBalanceHistoryResponse {
+  message Balance {
+    int64 timestamp = 1;
+    string balance = 2;
+  }
+  repeated Balance balances = 1;
+}
+
