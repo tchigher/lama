@@ -1,22 +1,24 @@
-// Enable common plugins
+import sbt.Keys.libraryDependencies
+// Build shared info
+ThisBuild / organization := "co.ledger"
+ThisBuild / version := "0.1.0-SNAPSHOT"
+ThisBuild / scalaVersion := "2.13.3"
+ThisBuild / resolvers += Resolver.sonatypeRepo("releases")
+ThisBuild / scalacOptions ++= CompilerFlags.all
+ThisBuild / buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion, git.gitHeadCommit)
+ThisBuild / buildInfoPackage := "buildinfo"
+ThisBuild / libraryDependencies += compilerPlugin("org.typelevel" %% "kind-projector" % "0.10.3")
+
 enablePlugins(BuildInfoPlugin)
 
 lazy val assemblyFolder = file("assembly")
 lazy val ignoreFiles    = List("application.conf.sample")
 
 // Runtime
-scalaVersion in ThisBuild := "2.13.3"
-scalacOptions in ThisBuild ++= CompilerFlags.all
-resolvers in ThisBuild += Resolver.sonatypeRepo("releases")
+scalaVersion := "2.13.3"
+scalacOptions ++= CompilerFlags.all
+resolvers += Resolver.sonatypeRepo("releases")
 addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.10.3")
-
-lazy val commonSettings = Seq(
-  organization := "co.ledger",
-  version := "0.0.1-SNAPSHOT",
-  libraryDependencies ++= Dependencies.common,
-  buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion, git.gitHeadCommit),
-  buildInfoPackage := "buildinfo"
-)
 
 lazy val assemblySettings = Seq(
   cleanFiles += assemblyFolder,
@@ -59,58 +61,61 @@ lazy val dockerSettings = Seq(
   }
 )
 
-lazy val projectSettings =
-  commonSettings ++ assemblySettings ++ dockerSettings ++ Defaults.itSettings
+lazy val sharedSettings = assemblySettings ++ dockerSettings ++ Defaults.itSettings
 
-// Common project to share code
+// Common lama library
 lazy val common = (project in file("common"))
-  .settings(commonSettings)
+  .settings(
+    name := "lama-account-manager",
+    sharedSettings,
+    libraryDependencies ++= Dependencies.lama_common
+  )
 
-// Projects
 lazy val accountManager = (project in file("account-manager"))
-  .enablePlugins(Fs2Grpc, DockerPlugin)
+  .enablePlugins(Fs2Grpc, FlywayPlugin, DockerPlugin)
   .configs(IntegrationTest)
   .settings(
-    projectSettings,
     name := "lama-account-manager",
-    libraryDependencies ++= (
-      Dependencies.postgres ++
-        Dependencies.redis ++
-        Dependencies.test
-    ),
+    sharedSettings,
+    // Dependencies
+    libraryDependencies ++= Dependencies.account_manager,
+    libraryDependencies ++= Dependencies.test,
+
+    // Proto config
+    scalapbCodeGeneratorOptions += CodeGeneratorOption.FlatPackage,
+
     // Flyway credentials to migrate sql scripts
-    flywayLocations := Seq("db/migration"),
+    flywayLocations += "db/migration",
     flywayUrl := "jdbc:postgresql://localhost:5432/lama",
     flywayUser := "lama",
     flywayPassword := "serge",
-    scalapbCodeGeneratorOptions += CodeGeneratorOption.FlatPackage
-  )
-  .dependsOn(common)
-
-lazy val bitcoinWorker = (project in file("coins/bitcoin/worker"))
-  .enablePlugins(DockerPlugin)
-  .configs(IntegrationTest)
-  .settings(
-    projectSettings,
-    name := "lama-bitcoin-worker",
-    libraryDependencies ++= (Dependencies.http4s ++ Dependencies.test)
-  )
-  .dependsOn(common)
+  ).dependsOn(common)
 
 lazy val bitcoinInterpreter = (project in file("coins/bitcoin/interpreter"))
   .enablePlugins(DockerPlugin)
   .configs(IntegrationTest)
   .settings(
-    projectSettings,
-    name := "lama-bitcoin-interpreter"
+    name := "lama-bitcoin-interpreter",
+    sharedSettings,
   )
   .dependsOn(common)
 
-//lazy val bitcoinService = (project in file("coins/bitcoin/service"))
-//  .enablePlugins(Fs2Grpc, DockerPlugin)
-//  .settings(
-//    name := "lama-bitcoin-service",
-//    version := "0.0.1-SNAPSHOT",
-//    libraryDependencies ++= (Dependencies.http4s ++ Dependencies.test)
-//  )
-//  .dependsOn(common)
+lazy val btcService = (project in file("coins/bitcoin/service"))
+  .enablePlugins(Fs2Grpc, DockerPlugin)
+  .settings(
+    name := "lama-bitcoin-service",
+    libraryDependencies ++= Dependencies.bitcoin_service,
+    sharedSettings
+  )
+  .dependsOn(common)
+
+lazy val btcWorker = (project in file("coins/bitcoin/worker"))
+  .enablePlugins(DockerPlugin)
+  .configs(IntegrationTest)
+  .settings(
+    name := "lama-bitcoin-worker",
+    sharedSettings,
+    libraryDependencies ++= (Dependencies.http4s ++ Dependencies.test)
+  )
+  .dependsOn(common)
+

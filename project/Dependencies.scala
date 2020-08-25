@@ -11,6 +11,14 @@ object Dependencies extends DependencyBuilders with LibraryManagementSyntax {
     "org.http4s" %% "http4s-prometheus-metrics" % http4sVersion
   )
 
+  val circeVersion = "0.13.0"
+  val circe: Seq[ModuleID] = Seq(
+    "io.circe" %% "circe-core"           % circeVersion,
+    "io.circe" %% "circe-parser"         % circeVersion,
+    "io.circe" %% "circe-generic"        % circeVersion,
+    "io.circe" %% "circe-generic-extras" % circeVersion
+  )
+
   val H2Version     = "1.4.200"
   val flywayVersion = "6.5.0"
   val doobieVersion = "0.8.8"
@@ -19,17 +27,8 @@ object Dependencies extends DependencyBuilders with LibraryManagementSyntax {
     "org.flywaydb"   % "flyway-core"     % flywayVersion,
     "org.tpolecat"  %% "doobie-core"     % doobieVersion,
     "org.tpolecat"  %% "doobie-postgres" % doobieVersion,
-    "org.tpolecat"  %% "doobie-postgres" % doobieVersion,
     "org.tpolecat"  %% "doobie-hikari"   % doobieVersion,
     "org.tpolecat"  %% "doobie-h2"       % doobieVersion
-  )
-
-  val circeVersion = "0.13.0"
-  val circe: Seq[ModuleID] = Seq(
-    "io.circe" %% "circe-core"           % circeVersion,
-    "io.circe" %% "circe-parser"         % circeVersion,
-    "io.circe" %% "circe-generic"        % circeVersion,
-    "io.circe" %% "circe-generic-extras" % circeVersion
   )
 
   val pureconfigVersion = "0.13.0"
@@ -67,6 +66,8 @@ object Dependencies extends DependencyBuilders with LibraryManagementSyntax {
     "it.ozimov"                % "embedded-redis"   % embeddedRedisVersion % Test
   )
 
-  val common: Seq[ModuleID] = circe ++ rabbit ++ utilities
+  val lama_common: Seq[ModuleID]     = circe ++ postgres ++ rabbit ++ utilities
+  val account_manager: Seq[ModuleID] = circe ++ postgres ++ rabbit ++ redis ++ utilities
+  val bitcoin_service: Seq[ModuleID] = http4s ++ circe ++ postgres ++ utilities
 
 }

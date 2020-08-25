@@ -1,7 +1,7 @@
 package co.ledger.lama.bitcoin.service.http
 
 import cats.effect.Sync
-import co.ledger.lama.bitcoin.service.http.AccountRoutes._
+// import co.ledger.lama.bitcoin.service.http.AccountRoutes._
 import org.http4s.HttpRoutes
 import org.http4s.dsl.Http4sDsl
 import org.http4s.dsl.impl.{OptionalQueryParamDecoderMatcher, QueryParamDecoderMatcher}
@@ -9,12 +9,12 @@ import org.http4s.server.Router
 
 class AccountRoutes[F[_]: Sync] extends Http4sDsl[F] {
   val routes: HttpRoutes[F] = Router("account" -> HttpRoutes.of {
-    case req @ POST -> Root =>
-      // req.as[CreateAccountRequest]
-      ???
-    case GET -> Root / id           => ???
-    case DELETE -> Root / id        => ???
-    case GET -> Root / id / "state" => ???
+//    case req @ POST -> Root =>
+//      // req.as[CreateAccountRequest]
+//      ???
+//    case GET -> Root / id           => ???
+//    case DELETE -> Root / id        => ???
+//    case GET -> Root / id / "state" => ???
     case GET -> Root / "balances"   =>
       // {
       //  "<accountId1>": "7",
@@ -23,15 +23,15 @@ class AccountRoutes[F[_]: Sync] extends Http4sDsl[F] {
       // }
       ???
     // return a list of observable addresses
-    case GET -> Root / id / "addresses" :? From(from) :? To(to) => ???
-    case GET -> Root / id / "addresses" / "fresh"               => ???
-    case GET -> Root / id / "utxo"                              => ???
-    case req @ POST -> Root / id / "tx"                         => ???
-    case req @ POST -> Root / id / "tx" / "send"                => ???
-    case GET -> Root / id / "txs"                               => ???
-    case GET -> Root / id / "balances" / "history"
-        :? Start(start) :? End(end) :? TimeInterval(timeInterval) =>
-      ???
+//    case GET -> Root / id / "addresses" :? From(from) :? To(to) => ???
+//    case GET -> Root / id / "addresses" / "fresh"               => ???
+//    case GET -> Root / id / "utxo"                              => ???
+//    case req @ POST -> Root / id / "tx"                         => ???
+//    case req @ POST -> Root / id / "tx" / "send"                => ???
+//    case GET -> Root / id / "txs"                               => ???
+//    case GET -> Root / id / "balances" / "history"
+//        :? Start(start) :? End(end) :? TimeInterval(timeInterval) =>
+//      ???
   })
 }
 
