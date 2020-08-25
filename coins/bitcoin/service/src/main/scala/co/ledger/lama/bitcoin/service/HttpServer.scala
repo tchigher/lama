@@ -43,7 +43,8 @@ object HttpServer extends ManagedChannelBuilderSyntax {
             .resource[F]
         bitcoinServiceGrpcClient = BitcoinServiceFs2Grpc.stub(managedChannel)
         currencyService          = new CurrencyService[F](bitcoinServiceGrpcClient)
-        currencyRoute            = new CurrencyRoutes[F](currencyService).routes
+//        currencyRoute            = new CurrencyRoutes[F](currencyService).routes
+        currencyRoute            = new CurrencyRoutes[F]().routes
         accountRoute             = new AccountRoutes[F].routes
       } yield currencyRoute <+> accountRoute
     }
