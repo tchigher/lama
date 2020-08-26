@@ -2,6 +2,6 @@
 
 Synchronization and management of account states (transactions, balance, ...) across Blockchain protocols.
 
-## How a synchronization works?
+## How account synchronization works?
 
 ![](./excalidraw/sync-overview.png)
