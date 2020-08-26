@@ -8,7 +8,7 @@ services:
       JDBC_URL: ${JDBC_URL:-jdbc:postgresql://lama-postgres:5432/lama}
       DB_USER: ${DB_USER:-lama}
       DB_PASSWORD: ${DB_PASSWORD:-serge}
-      WORKER_EXCHANGE_NAME: ${WORKER_EXCHANGE_NAME:-worker.events}
+      WORKER_EVENTS_EXCHANGE_NAME: ${WORKER_EVENTS_EXCHANGE_NAME:-worker.events}
       LAMA_EVENTS_EXCHANGE_NAME: ${LAMA_EVENTS_EXCHANGE_NAME:-lama.events}
       RABBIT_HOST: ${RABBIT_HOST:-lama-rabbitmq}
       RABBIT_PORT: ${RABBI_PORT:-5672}

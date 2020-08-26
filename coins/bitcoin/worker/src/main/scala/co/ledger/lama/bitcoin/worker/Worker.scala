@@ -5,12 +5,12 @@ import co.ledger.lama.bitcoin.worker.services._
 import fs2.Stream
 
 class Worker(
-    rabbit: RabbitService,
+    rabbit: SyncEventService,
     keychain: KeychainService,
     explorer: ExplorerService,
     interpreter: InterpreterService
 ) {
 
-  def run: Stream[IO, Unit] = ???
+  def run: Stream[IO, Unit] = Stream.emit(println("run"))
 
 }

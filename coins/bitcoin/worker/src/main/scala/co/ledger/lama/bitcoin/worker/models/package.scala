@@ -132,4 +132,40 @@ package object models {
     implicit val decoder: Decoder[AccountIdentifier] = deriveDecoder[AccountIdentifier]
   }
 
+  object explorer {
+
+    type BlockHash   = String
+    type BlockHeight = Long
+
+    case class Block(hash: BlockHash, height: BlockHeight, time: String, txs: Seq[BlockHash])
+
+    object Block {
+      implicit val decoder: Decoder[Block] = deriveDecoder[Block]
+    }
+
+    case class GetTransactionsResponse(truncated: Boolean, txs: Seq[Transaction])
+
+    object GetTransactionsResponse {
+      implicit val decoder: Decoder[GetTransactionsResponse] =
+        deriveDecoder[GetTransactionsResponse]
+    }
+
+    case class Transaction(
+        id: String,
+        hash: String,
+        receivedAt: String,
+        lockTime: Long,
+        fees: BigInt,
+        inputs: Seq[Json],
+        outputs: Seq[Json],
+        block: Block,
+        confirmations: Int
+    )
+
+    object Transaction {
+      implicit val decoder: Decoder[Transaction] = deriveDecoder[Transaction]
+    }
+
+  }
+
 }

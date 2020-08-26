@@ -58,7 +58,8 @@ lazy val common = (project in file("common"))
 lazy val worker = (project in file("worker"))
   .settings(
     name := "lama-bitcoin-worker",
-    version := "0.0.1-SNAPSHOT"
+    version := "0.0.1-SNAPSHOT",
+    libraryDependencies ++= Dependencies.http4s
   )
   .dependsOn(common)
 

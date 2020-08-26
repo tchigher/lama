@@ -79,7 +79,7 @@ trait TestResources extends TestSuite with BeforeAndAfterAll {
     rabbit.use { client =>
       val coinConfs          = conf.orchestrator.coins
       val eventsExchangeName = conf.orchestrator.lamaEventsExchangeName
-      val workerExchangeName = conf.orchestrator.workerExchangeName
+      val workerExchangeName = conf.orchestrator.workerEventsExchangeName
 
       client.createConnectionChannel.use { implicit channel =>
         val deleteQueues = coinConfs

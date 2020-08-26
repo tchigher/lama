@@ -52,7 +52,7 @@ object config {
   }
 
   case class OrchestratorConfig(
-      workerExchangeName: ExchangeName,
+      workerEventsExchangeName: ExchangeName,
       lamaEventsExchangeName: ExchangeName,
       coins: List[CoinConfig]
   )
