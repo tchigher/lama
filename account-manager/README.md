@@ -1,9 +1,8 @@
-Lama - Account Manager
-==========================================================================================================================================================================================
+# Lama - Account Manager
 
 ![](./excalidraw/account-manager.png)
 
-# Getting started
+## Getting started
 1. Install [sbt][sbt]
 2. Clone the repo
 3. Install [PostgreSQL][postgresql] and configure access for user `lama` and password `serge` (default user and password from `src/main/resources/application.conf`)
@@ -13,19 +12,19 @@ Lama - Account Manager
 7. Install [Redis][redis] with the default configuration
 8. Launch the app: `sbt run`
 
-# Database migration
+## Database migration
 
 The project uses [flywayt-sbt][flywayt-sbt] to migrate sql scripts in the folder `src/main/resources/db/migration`.
 
 Migrate your database using `sbt flywayMigrate` or clean it using `sbt flywayClean.
 
-# Testing
+## Testing
 
 Unit tests: `sbt test`
 
 Integration tests: `sbt it:test`
 
-# Docker
+## Docker
 
 The plugin [sbt-docker][sbt-docker] is used to build, run and publish the docker image.
 
@@ -46,7 +45,7 @@ Builds an image using the local Docker server, and pushes it to the configured r
 - `sbt docker:clean`
 Removes the built image from the local Docker server.
 
-## Run dockerized lama account manager
+### Run dockerized lama account manager
 Please have a look on `docker-compose.yml` file for more details on configuration.
 This will create a PostgreSql, a RabbitMQ and the latest published image of the lama account manager.
 
