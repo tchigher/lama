@@ -5,7 +5,13 @@ ThisBuild / version := "0.1.0-SNAPSHOT"
 ThisBuild / scalaVersion := "2.13.3"
 ThisBuild / resolvers += Resolver.sonatypeRepo("releases")
 ThisBuild / scalacOptions ++= CompilerFlags.all
-ThisBuild / buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion, git.gitHeadCommit)
+ThisBuild / buildInfoKeys := Seq[BuildInfoKey](
+  name,
+  version,
+  scalaVersion,
+  sbtVersion,
+  git.gitHeadCommit
+)
 ThisBuild / buildInfoPackage := "buildinfo"
 ThisBuild / libraryDependencies += compilerPlugin("org.typelevel" %% "kind-projector" % "0.10.3")
 
@@ -52,7 +58,6 @@ lazy val dockerSettings = Seq(
     // The assembly task generates a fat JAR file
     val artifact: File     = assembly.value
     val artifactTargetPath = s"/app/${artifact.name}"
-
     new Dockerfile {
       from("openjdk:14.0.2")
       add(artifact, artifactTargetPath)
@@ -66,7 +71,7 @@ lazy val sharedSettings = assemblySettings ++ dockerSettings ++ Defaults.itSetti
 // Common lama library
 lazy val common = (project in file("common"))
   .settings(
-    name := "lama-account-manager",
+    name := "lama-common",
     sharedSettings,
     libraryDependencies ++= Dependencies.lama_common
   )
@@ -80,23 +85,22 @@ lazy val accountManager = (project in file("account-manager"))
     // Dependencies
     libraryDependencies ++= Dependencies.account_manager,
     libraryDependencies ++= Dependencies.test,
-
     // Proto config
     scalapbCodeGeneratorOptions += CodeGeneratorOption.FlatPackage,
-
     // Flyway credentials to migrate sql scripts
     flywayLocations += "db/migration",
     flywayUrl := "jdbc:postgresql://localhost:5432/lama",
     flywayUser := "lama",
-    flywayPassword := "serge",
-  ).dependsOn(common)
+    flywayPassword := "serge"
+  )
+  .dependsOn(common)
 
 lazy val bitcoinInterpreter = (project in file("coins/bitcoin/interpreter"))
   .enablePlugins(DockerPlugin)
   .configs(IntegrationTest)
   .settings(
     name := "lama-bitcoin-interpreter",
-    sharedSettings,
+    sharedSettings
   )
   .dependsOn(common)
 
@@ -118,4 +122,3 @@ lazy val btcWorker = (project in file("coins/bitcoin/worker"))
     libraryDependencies ++= (Dependencies.http4s ++ Dependencies.test)
   )
   .dependsOn(common)
-
