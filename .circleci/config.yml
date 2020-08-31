@@ -3,58 +3,127 @@
 # Check https://circleci.com/docs/2.0/sample-config/ for more details
 #
 version: 2.1
+
+orbs:
+  docker: ledger/docker@volatile
+  codecov: codecov/codecov@1.0.2
+  
+aliases:
+  - &filter_all_tags
+    tags:
+      only: /.*/
+  - &restore_docker_cache
+    keys:
+      - lama-docker-{{ .Branch }}-{{ checksum "build.sbt" }}
+      - lama-docker-{{ .Branch }}
+      - lama-docker
+  - &save_docker_cache
+    key: lama-docker-{{ .Branch }}-{{ checksum "build.sbt" }}
+    paths:
+      - .ivy2
+      - .sbt
+  - &restore_machine_cache
+    keys:
+      - lama-machine-{{ .Branch }}-{{ checksum "build.sbt" }}
+      - lama-machine-{{ .Branch }}
+      - lama-machine
+  - &save_machine_cache
+    key: lama-machine-{{ .Branch }}-{{ checksum "build.sbt" }}
+    paths:
+      - .ivy2
+      - .sbt
+
+parameters:
+  sbt:
+    type: string
+    default: SBT_OPTS="-Xss512m" sbt -Dsbt.ivy.home=.ivy2 -sbt-dir .sbt
+
 jobs:
   build:
     docker:
-      # specify the version you desire here
-      - image: circleci/openjdk:8-jdk
-
-    environment:
-      # Customize the JVM maximum heap limit
-      JVM_OPTS: -Xmx3200m
-      TERM: dumb
-
+      - image: ledgerhq/sbt-openjdk-8
+        environment:
+          JVM_OPTS: -Xmx3200m
+          TERM: dumb
+        auth:
+          username: $DOCKER_USERNAME
+          password: $DOCKER_PASSWORD
     steps:
       - checkout
+      - restore_cache: *restore_docker_cache
+      - run:
+          name: Compile
+          command: << pipeline.parameters.sbt >> compile test:compile it:compile
+      - save_cache: *save_docker_cache
 
-      # Download and cache dependencies
-      - restore_cache:
-          keys:
-            - v1-dependencies-{{ checksum "build.sbt" }}
-            # fallback to using the latest cache if no exact match is found
-            - v1-dependencies-
-
-      - run: cat /dev/null | sbt accountManager/test:compile
-
-      - save_cache:
-          paths:
-            - ~/.m2
-          key: v1-dependencies--{{ checksum "build.sbt" }}
-
-      # Save workspace for subsequent jobs (i.e. test)
-      - persist_to_workspace:
-          root: .
-          paths:
-            - .
-  account_manager_tests:
+  scala_linter:
     docker:
-      # specify the version you desire here
-      - image: circleci/openjdk:8-jdk
+      - image: ledgerhq/sbt-openjdk-8
+        auth:
+          username: $DOCKER_USERNAME
+          password: $DOCKER_PASSWORD
+    steps:
+      - checkout
+      - restore_cache: *restore_docker_cache
+      - run:
+          name: Run scalastyle
+          command: << pipeline.parameters.sbt >> scalastyle
 
-    environment:
-      # Customize the JVM maximum heap limit
-      JVM_OPTS: -Xmx3200m
-      TERM: dumb
+  unit_tests:
+    docker:
+      - image: ledgerhq/sbt-openjdk-8
+        environment:
+          JVM_OPTS: -Xmx3200m
+          TERM: dumb
+        auth:
+          username: $DOCKER_USERNAME
+          password: $DOCKER_PASSWORD
+    steps:
+      - checkout
+      - restore_cache: *restore_docker_cache
+      - run:
+          name: Run Account Manager unit tests
+          command: << pipeline.parameters.sbt >> accountManager/test
+      - run:
+          name: Run Account Manager unit tests
+          command: << pipeline.parameters.sbt >> btcService/test
+      - run:
+          name: Run Account Manager unit tests
+          command: << pipeline.parameters.sbt >> btcWorker/test
+
+  generate_docker_images:
+    machine:
+      image: circleci/classic:latest
 
     steps:
-      # Reuse the workspace from the build job
-      - attach_workspace:
-          at: .
       - checkout
-      - run: cat /dev/null | sbt accountManager/test
+      - restore_cache: *restore_machine_cache
+      - run:
+          name: Generate docker images froml sbt docker plugin
+          command: << pipeline.parameters.sbt >> docker
+      - save_cache: *save_docker_cache
 
 workflows:
+  version: 2.1
   build_and_test:
     jobs:
       - build
-      - account_manager_tests
+      - unit_tests:
+          requires:
+            - build
+      - generate_docker_images:
+          requires:
+            - build
+      - docker/build_image:
+          requires:
+           - generate_docker_images
+          after_checkout:
+            - run:
+                name: Generate docker images froml sbt docker plugin
+                command: << pipeline.parameters.sbt >> docker
+          docker_build_target: account-manager/target/docker
+          docker_project_name: lama-account-manager
+      - docker/publish_image:
+          context: githubpkg
+          requires:
+            - generate_docker_images
