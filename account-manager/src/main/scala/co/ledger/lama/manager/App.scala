@@ -1,8 +1,8 @@
 package co.ledger.lama.manager
 
 import cats.effect.{Blocker, ExitCode, IO, IOApp, Resource}
+import co.ledger.lama.common.utils.RabbitUtils
 import co.ledger.lama.manager.config.Config
-import co.ledger.lama.manager.utils.RabbitUtils
 import com.redis.RedisClient
 import doobie.hikari.HikariTransactor
 import doobie.util.ExecutionContexts

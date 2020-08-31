@@ -3,8 +3,8 @@ package co.ledger.lama.manager
 import java.util.UUID
 
 import cats.effect.{ContextShift, IO, Timer}
-import co.ledger.lama.manager.models.SyncEvent.Status
-import co.ledger.lama.manager.models._
+import co.ledger.lama.common.models._
+import co.ledger.lama.common.utils.IOAssertion
 import fs2.{Pipe, Stream}
 import org.scalatest.flatspec.AnyFlatSpecLike
 import org.scalatest.matchers.should.Matchers
@@ -39,10 +39,10 @@ class OrchestratorSpec extends AnyFlatSpecLike with Matchers {
 class FakeOrchestrator(nbEvents: Int, override val awakeEvery: FiniteDuration)
     extends Orchestrator {
 
-  val syncEvents: Seq[SyncEvent] =
+  val syncEvents: Seq[WorkableEvent] =
     (1 to nbEvents).map { i =>
       val accountIdentifier = AccountIdentifier(s"xpub-$i", CoinFamily.Bitcoin, Coin.Btc)
-      SyncEvent(
+      WorkableEvent(
         accountId = UUID.randomUUID(),
         syncId = UUID.randomUUID(),
         status = Status.Registered,
@@ -54,7 +54,7 @@ class FakeOrchestrator(nbEvents: Int, override val awakeEvery: FiniteDuration)
 
 }
 
-class FakeSyncEventTask(events: Seq[SyncEvent]) extends SyncEventTask {
+class FakeSyncEventTask(events: Seq[WorkableEvent]) extends SyncEventTask {
 
   var reportedEvents: mutable.Seq[SyncEvent] = mutable.Seq.empty
 
@@ -62,9 +62,9 @@ class FakeSyncEventTask(events: Seq[SyncEvent]) extends SyncEventTask {
 
   var triggeredEvents: mutable.Seq[SyncEvent] = mutable.Seq.empty
 
-  def publishableEvents: Stream[IO, SyncEvent] = Stream.emits(events)
+  def publishableEvents: Stream[IO, WorkableEvent] = Stream.emits(events)
 
-  def publishEventsPipe: Pipe[IO, SyncEvent, Unit] =
+  def publishEventsPipe: Pipe[IO, WorkableEvent, Unit] =
     _.evalMap(sp =>
       IO.pure(
         publishedEvents.update(
@@ -74,22 +74,25 @@ class FakeSyncEventTask(events: Seq[SyncEvent]) extends SyncEventTask {
       )
     )
 
-  def reportableEvents: Stream[IO, SyncEvent] =
+  def reportableEvents: Stream[IO, ReportableEvent] =
     Stream.emits(
-      events.map(sp => SyncEvent(sp.accountId, sp.syncId, Status.Synchronized, sp.payload))
+      events.map(sp => ReportableEvent(sp.accountId, sp.syncId, Status.Synchronized, sp.payload))
     )
 
-  def reportEventsPipe: Pipe[IO, SyncEvent, Unit] =
+  def reportEventsPipe: Pipe[IO, ReportableEvent, Unit] =
     _.evalMap { e =>
       IO.pure { reportedEvents = reportedEvents :+ e }
     }
 
-  def triggerableEvents: Stream[IO, SyncEvent] = Stream.emits(events)
+  def triggerableEvents: Stream[IO, TriggerableEvent] =
+    Stream.emits(
+      events.map(e => TriggerableEvent(e.accountId, e.syncId, Status.Synchronized, e.payload))
+    )
 
-  def triggerEventsPipe: Pipe[IO, SyncEvent, Unit] =
+  def triggerEventsPipe: Pipe[IO, TriggerableEvent, Unit] =
     _.evalMap { e =>
       IO.pure {
-        triggeredEvents = triggeredEvents :+ SyncEvent.nextFromTriggerable(e, Status.Synchronized)
+        triggeredEvents = triggeredEvents :+ e.nextWorkable
       }
     }
 }

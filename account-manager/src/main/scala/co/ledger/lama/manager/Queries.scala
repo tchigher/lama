@@ -2,8 +2,19 @@ package co.ledger.lama.manager
 
 import java.util.UUID
 
-import co.ledger.lama.manager.models.SyncEvent.Status
+import cats.data.NonEmptyList
+import co.ledger.lama.common.models.{
+  AccountIdentifier,
+  Coin,
+  CoinFamily,
+  SyncEvent,
+  TriggerableEvent,
+  TriggerableStatus,
+  WorkableEvent,
+  WorkableStatus
+}
 import co.ledger.lama.manager.models._
+import co.ledger.lama.manager.models.implicits._
 import doobie.Fragments
 import doobie.free.connection.ConnectionIO
 import doobie.implicits._
@@ -18,22 +29,22 @@ object Queries {
   def fetchPublishableEvents(
       coinFamily: CoinFamily,
       coin: Coin
-  ): Stream[ConnectionIO, SyncEvent] =
+  ): Stream[ConnectionIO, WorkableEvent] =
     (
       sql"""SELECT account_id, sync_id, status, payload
           FROM account_sync_status
           WHERE coin_family = $coinFamily
           AND coin = $coin
           AND """
-        ++ Fragments.in(fr"status", Status.sendableStatuses)
+        ++ Fragments.in(fr"status", NonEmptyList.fromListUnsafe(WorkableStatus.all.values.toList))
     )
-      .query[SyncEvent]
+      .query[WorkableEvent]
       .stream
 
   def fetchTriggerableEvents(
       coinFamily: CoinFamily,
       coin: Coin
-  ): Stream[ConnectionIO, SyncEvent] =
+  ): Stream[ConnectionIO, TriggerableEvent] =
     (
       sql"""SELECT account_id, sync_id, status, payload
           FROM account_sync_status
@@ -41,9 +52,12 @@ object Queries {
           AND coin_family = $coinFamily
           AND coin = $coin
           AND """
-        ++ Fragments.in(fr"status", Status.triggerableStatuses)
+        ++ Fragments.in(
+          fr"status",
+          NonEmptyList.fromListUnsafe(TriggerableStatus.all.values.toList)
+        )
     )
-      .query[SyncEvent]
+      .query[TriggerableEvent]
       .stream
 
   def getAccountInfo(accountIdentifier: AccountIdentifier): ConnectionIO[Option[AccountInfo]] =

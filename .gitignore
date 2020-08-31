@@ -1,6 +1,10 @@
 .metals
 .bloop
 .idea
-assembly
 .sbt
 .DS_Store
+
+assembly
+target
+project/project
+project/target

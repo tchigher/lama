@@ -2,8 +2,8 @@ package co.ledger.lama.manager
 
 import cats.effect.{Concurrent, ContextShift, IO, Timer}
 import cats.implicits._
+import co.ledger.lama.common.utils.RabbitUtils
 import co.ledger.lama.manager.config.{CoinConfig, OrchestratorConfig}
-import co.ledger.lama.manager.utils.RabbitUtils
 import com.redis.RedisClient
 import dev.profunktor.fs2rabbit.interpreter.RabbitClient
 import dev.profunktor.fs2rabbit.model.ExchangeType

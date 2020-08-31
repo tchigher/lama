@@ -1,156 +1,56 @@
 package co.ledger.lama.bitcoin.worker
 
-import java.nio.charset.StandardCharsets
-import java.util.UUID
-
-import cats.data.Kleisli
-import cats.effect.IO
-import cats.implicits._
-import dev.profunktor.fs2rabbit.effects.MessageEncoder
-import dev.profunktor.fs2rabbit.model.{AmqpMessage, AmqpProperties}
+import co.ledger.lama.bitcoin.worker.models.Keychain.Address
+import co.ledger.lama.bitcoin.worker.models.explorer.{BlockHash, BlockHeight, Transaction}
+import io.circe.generic.extras._
 import io.circe.generic.semiauto._
 import io.circe.{Decoder, Encoder, Json}
-import io.circe.syntax._
 
 package object models {
 
-  sealed trait SyncEvent[S <: Status] {
-    def accountId: UUID
-    def syncId: UUID
-    def status: S
-    def payload: Payload // TODO: type it correctly
+  case class PayloadData(
+      blockHeight: Option[BlockHeight] = None,
+      blockHash: Option[BlockHash] = None,
+      txsSize: Option[Int] = None,
+      errorMessage: Option[String] = None
+  )
+
+  object PayloadData {
+    implicit val encoder: Encoder[PayloadData] = deriveEncoder[PayloadData]
+    implicit val decoder: Decoder[PayloadData] = deriveDecoder[PayloadData]
   }
 
-  case class InitialSyncEvent(
-      accountId: UUID,
-      syncId: UUID,
-      status: InitialStatus,
-      payload: Payload
-  ) extends SyncEvent[InitialStatus] {
-    def reportSuccess(data: Json): ReportSyncEvent =
-      ReportSyncEvent(accountId, syncId, status.success, payload.copy(data = data))
-
-    def reportFailure(data: Json): ReportSyncEvent =
-      ReportSyncEvent(accountId, syncId, status.failure, payload.copy(data = data))
-  }
-
-  object InitialSyncEvent {
-    implicit val encoder: Encoder[InitialSyncEvent] = deriveEncoder[InitialSyncEvent]
-    implicit val decoder: Decoder[InitialSyncEvent] = deriveDecoder[InitialSyncEvent]
-  }
-
-  case class ReportSyncEvent(
-      accountId: UUID,
-      syncId: UUID,
-      status: ReportStatus,
-      payload: Payload
-  ) extends SyncEvent[ReportStatus]
-
-  object ReportSyncEvent {
-    implicit val encoder: Encoder[ReportSyncEvent] = deriveEncoder[ReportSyncEvent]
-    implicit val decoder: Decoder[ReportSyncEvent] = deriveDecoder[ReportSyncEvent]
-
-    implicit val rabbitEncoder: MessageEncoder[IO, ReportSyncEvent] =
-      Kleisli[IO, ReportSyncEvent, AmqpMessage[Array[Byte]]] { s =>
-        AmqpMessage(
-          payload = s.asJson.noSpaces.getBytes(StandardCharsets.UTF_8),
-          properties = AmqpProperties.empty
-        ).pure[IO]
-      }
-  }
-
-  sealed trait Status {
-    def name: String
-  }
-
-  abstract class InitialStatus(
-      val name: String,
-      val success: ReportStatus,
-      val failure: ReportStatus
-  ) extends Status
-
-  object InitialStatus {
-    case object Registered
-        extends InitialStatus("registered", ReportStatus.Synchronized, ReportStatus.SyncFailed)
-
-    case object Unregistered
-        extends InitialStatus("unregistered", ReportStatus.Deleted, ReportStatus.DeleteFailed)
-
-    implicit val encoder: Encoder[InitialStatus] = Encoder.encodeString.contramap(_.name)
-
-    implicit val decoder: Decoder[InitialStatus] =
-      Decoder.decodeString.emap(
-        fromKey(_).toRight("unable to decode status")
-      )
-
-    val all: Map[String, InitialStatus] =
-      Map(
-        Registered.name   -> Registered,
-        Unregistered.name -> Unregistered
-      )
-
-    def fromKey(key: String): Option[InitialStatus] = all.get(key)
-  }
-
-  abstract class ReportStatus(val name: String) extends Status
-
-  object ReportStatus {
-    case object Synchronized extends ReportStatus("synchronized")
-    case object SyncFailed   extends ReportStatus("sync_failed")
-    case object Deleted      extends ReportStatus("deleted")
-    case object DeleteFailed extends ReportStatus("delete_failed")
-
-    implicit val encoder: Encoder[ReportStatus] = Encoder.encodeString.contramap(_.name)
-
-    implicit val decoder: Decoder[ReportStatus] =
-      Decoder.decodeString.emap(
-        fromKey(_).toRight("unable to decode status")
-      )
-
-    val all: Map[String, ReportStatus] =
-      Map(
-        Synchronized.name -> Synchronized,
-        SyncFailed.name   -> SyncFailed,
-        Deleted.name      -> Deleted,
-        DeleteFailed.name -> DeleteFailed
-      )
-
-    def fromKey(key: String): Option[ReportStatus] = all.get(key)
-  }
-
-  case class Payload(account: AccountIdentifier, data: Json = Json.obj())
-
-  object Payload {
-    implicit val encoder: Encoder[Payload] = deriveEncoder[Payload]
-    implicit val decoder: Decoder[Payload] = deriveDecoder[Payload]
-  }
-
-  case class AccountIdentifier(extendedKey: String)
-
-  object AccountIdentifier {
-    implicit val encoder: Encoder[AccountIdentifier] = deriveEncoder[AccountIdentifier]
-    implicit val decoder: Decoder[AccountIdentifier] = deriveDecoder[AccountIdentifier]
-  }
+  case class AddressWithTransactions(address: Address, txs: List[Transaction])
 
   object explorer {
+
+    implicit val config: Configuration = Configuration.default.withSnakeCaseMemberNames
 
     type BlockHash   = String
     type BlockHeight = Long
 
-    case class Block(hash: BlockHash, height: BlockHeight, time: String, txs: Seq[BlockHash])
+    case class Block(
+        hash: BlockHash,
+        height: BlockHeight,
+        time: String,
+        txs: Option[Seq[BlockHash]]
+    )
 
     object Block {
+      implicit val encoder: Encoder[Block] = deriveEncoder[Block]
       implicit val decoder: Decoder[Block] = deriveDecoder[Block]
     }
 
     case class GetTransactionsResponse(truncated: Boolean, txs: Seq[Transaction])
 
     object GetTransactionsResponse {
+      implicit val encoder: Encoder[GetTransactionsResponse] =
+        deriveEncoder[GetTransactionsResponse]
       implicit val decoder: Decoder[GetTransactionsResponse] =
         deriveDecoder[GetTransactionsResponse]
     }
 
-    case class Transaction(
+    @ConfiguredJsonCodec case class Transaction(
         id: String,
         hash: String,
         receivedAt: String,
@@ -163,9 +63,14 @@ package object models {
     )
 
     object Transaction {
+      implicit val encoder: Encoder[Transaction] = deriveEncoder[Transaction]
       implicit val decoder: Decoder[Transaction] = deriveDecoder[Transaction]
     }
 
+  }
+
+  object Keychain {
+    type Address = String
   }
 
 }

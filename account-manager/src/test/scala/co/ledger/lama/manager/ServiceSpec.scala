@@ -3,11 +3,12 @@ package co.ledger.lama.manager
 import java.util.UUID
 
 import cats.effect.{Blocker, ContextShift, IO, Resource}
+import co.ledger.lama.common.models._
+import co.ledger.lama.common.utils.IOAssertion
 import co.ledger.lama.manager.Exceptions.AccountNotFoundException
 import co.ledger.lama.manager.config.CoinConfig
-import co.ledger.lama.manager.models.{AccountIdentifier, Coin, CoinFamily, SyncEvent}
 import co.ledger.lama.manager.protobuf.{AccountInfoRequest, BlockHeightState}
-import co.ledger.lama.manager.utils.UuidUtils
+import co.ledger.lama.manager.utils.{ProtobufUtils, UuidUtils}
 import co.ledger.lama.manager.{protobuf => pb}
 import com.opentable.db.postgres.embedded.{EmbeddedPostgres, FlywayPreparer}
 import doobie.hikari.HikariTransactor
@@ -82,21 +83,21 @@ class ServiceSpec extends AnyFlatSpecLike with Matchers with BeforeAndAfterAll {
 
         // it should be an account uuid from extendKey, coinFamily, coin
         accountId shouldBe
-          UuidUtils.fromAccountIdentifier(
+          AccountIdentifier(
             registerBitcoinAccount.extendedKey,
             CoinFamily.Bitcoin,
             Coin.Btc
-          )
+          ).id
 
         // it should be the default sync frequency from the bitcoin config
         syncFrequency shouldBe defaultBitcoinSyncFrequency
 
         // check event
         event shouldBe Some(
-          SyncEvent(
+          WorkableEvent(
             accountId,
             syncId,
-            SyncEvent.Status.Registered,
+            Status.Registered,
             SyncEvent.Payload(accountIdentifier)
           )
         )
@@ -130,10 +131,10 @@ class ServiceSpec extends AnyFlatSpecLike with Matchers with BeforeAndAfterAll {
 
         // check event
         event shouldBe Some(
-          SyncEvent(
+          WorkableEvent(
             accountId,
             syncId,
-            SyncEvent.Status.Registered,
+            Status.Registered,
             SyncEvent.Payload(accountIdentifier)
           )
         )
@@ -166,10 +167,10 @@ class ServiceSpec extends AnyFlatSpecLike with Matchers with BeforeAndAfterAll {
 
         // check event
         event shouldBe Some(
-          SyncEvent(
+          WorkableEvent(
             accountId,
             syncId,
-            SyncEvent.Status.Registered,
+            Status.Registered,
             SyncEvent.Payload(
               accountIdentifier,
               Json.obj("blockHeight" -> Json.fromLong(blockHeightValue))
@@ -209,10 +210,10 @@ class ServiceSpec extends AnyFlatSpecLike with Matchers with BeforeAndAfterAll {
         // check event
         unregisteredEvent = event.get
         unregisteredEvent shouldBe
-          SyncEvent(
+          WorkableEvent(
             accountId,
             syncId,
-            SyncEvent.Status.Unregistered,
+            Status.Unregistered,
             SyncEvent.Payload(accountIdentifier)
           )
       }
@@ -249,7 +250,7 @@ class ServiceSpec extends AnyFlatSpecLike with Matchers with BeforeAndAfterAll {
           val accountId    = UuidUtils.bytesToUuid(response.accountId)
           val synFrequency = response.syncFrequency
           val lastSyncEvent =
-            response.lastSyncEvent.flatMap(SyncEvent.fromProtobuf(registeredAccountId, _))
+            response.lastSyncEvent.flatMap(ProtobufUtils.from(registeredAccountId, _))
 
           accountId shouldBe Some(registeredAccountId)
           synFrequency shouldBe updatedSyncFrequency
@@ -277,7 +278,7 @@ class ServiceSpec extends AnyFlatSpecLike with Matchers with BeforeAndAfterAll {
         for {
           accountId     <- UuidUtils.bytesToUuid(accountInfo.accountId)
           lastSyncEvent <- accountInfo.lastSyncEvent
-          result        <- SyncEvent.fromProtobuf(accountId, lastSyncEvent)
+          result        <- ProtobufUtils.from(accountId, lastSyncEvent)
         } yield result
       }
 

@@ -1,4 +1,4 @@
-package co.ledger.lama.manager
+package co.ledger.lama.common.utils
 
 import cats.effect.IO
 

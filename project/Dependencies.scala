@@ -2,6 +2,28 @@ import sbt.librarymanagement.{DependencyBuilders, LibraryManagementSyntax, Modul
 
 object Dependencies extends DependencyBuilders with LibraryManagementSyntax {
 
+  val http4sVersion = "0.21.0"
+  val http4s: Seq[ModuleID] = Seq(
+    "org.http4s" %% "http4s-blaze-server"       % http4sVersion,
+    "org.http4s" %% "http4s-blaze-client"       % http4sVersion,
+    "org.http4s" %% "http4s-circe"              % http4sVersion,
+    "org.http4s" %% "http4s-dsl"                % http4sVersion,
+    "org.http4s" %% "http4s-prometheus-metrics" % http4sVersion
+  )
+
+  val H2Version     = "1.4.200"
+  val flywayVersion = "6.5.0"
+  val doobieVersion = "0.8.8"
+  val postgres: Seq[ModuleID] = Seq(
+    "com.h2database" % "h2"              % H2Version,
+    "org.flywaydb"   % "flyway-core"     % flywayVersion,
+    "org.tpolecat"  %% "doobie-core"     % doobieVersion,
+    "org.tpolecat"  %% "doobie-postgres" % doobieVersion,
+    "org.tpolecat"  %% "doobie-postgres" % doobieVersion,
+    "org.tpolecat"  %% "doobie-hikari"   % doobieVersion,
+    "org.tpolecat"  %% "doobie-h2"       % doobieVersion
+  )
+
   val circeVersion = "0.13.0"
   val circe: Seq[ModuleID] = Seq(
     "io.circe" %% "circe-core"           % circeVersion,
@@ -10,31 +32,25 @@ object Dependencies extends DependencyBuilders with LibraryManagementSyntax {
     "io.circe" %% "circe-generic-extras" % circeVersion
   )
 
-  val H2Version     = "1.4.200"
-  val flywayVersion = "6.5.0"
-  val doobieVersion = "0.8.8"
-  val db: Seq[ModuleID] = Seq(
-    "com.h2database" % "h2"              % H2Version,
-    "org.flywaydb"   % "flyway-core"     % flywayVersion,
-    "org.tpolecat"  %% "doobie-core"     % doobieVersion,
-    "org.tpolecat"  %% "doobie-postgres" % doobieVersion,
-    "org.tpolecat"  %% "doobie-hikari"   % doobieVersion,
-    "org.tpolecat"  %% "doobie-h2"       % doobieVersion
-  )
-
   val pureconfigVersion = "0.13.0"
   val logbackVersion    = "1.2.3"
   val fs2Version        = "2.4.2"
-  val fs2RabbitVersion  = "2.1.1"
-  val scalaRedisVersion = "3.30"
   val utilities: Seq[ModuleID] = Seq(
     "co.fs2"                %% "fs2-core"          % fs2Version,
-    "dev.profunktor"        %% "fs2-rabbit"        % fs2RabbitVersion,
     "ch.qos.logback"         % "logback-classic"   % logbackVersion,
     "com.github.pureconfig" %% "pureconfig"        % pureconfigVersion,
     "com.github.pureconfig" %% "pureconfig-cats"   % pureconfigVersion,
-    "net.debasishg"         %% "redisclient"       % scalaRedisVersion,
     "io.grpc"                % "grpc-netty-shaded" % scalapb.compiler.Version.grpcJavaVersion
+  )
+
+  val fs2RabbitVersion = "2.1.1"
+  val rabbit: Seq[ModuleID] = Seq(
+    "dev.profunktor" %% "fs2-rabbit" % fs2RabbitVersion
+  )
+
+  val scalaRedisVersion = "3.30"
+  val redis: Seq[ModuleID] = Seq(
+    "net.debasishg" %% "redisclient" % scalaRedisVersion
   )
 
   val scalaTestVersion     = "3.2.0"
@@ -51,6 +67,6 @@ object Dependencies extends DependencyBuilders with LibraryManagementSyntax {
     "it.ozimov"                % "embedded-redis"   % embeddedRedisVersion % Test
   )
 
-  val all: Seq[ModuleID] = circe ++ db ++ utilities ++ test
+  val common: Seq[ModuleID] = circe ++ rabbit ++ utilities
 
 }

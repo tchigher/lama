@@ -1,6 +1,6 @@
 package co.ledger.lama.manager
 
-import co.ledger.lama.manager.models.{Coin, CoinFamily}
+import co.ledger.lama.common.models.{Coin, CoinFamily}
 import dev.profunktor.fs2rabbit.config.{Fs2RabbitConfig, Fs2RabbitNodeConfig}
 import dev.profunktor.fs2rabbit.model.{ExchangeName, QueueName, RoutingKey}
 import pureconfig.ConfigReader

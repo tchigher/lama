@@ -3,7 +3,6 @@ package co.ledger.lama.manager.utils
 import java.nio.ByteBuffer
 import java.util.UUID
 
-import co.ledger.lama.manager.models.{CoinFamily, Coin}
 import com.google.protobuf.ByteString
 
 object UuidUtils {
@@ -21,8 +20,5 @@ object UuidUtils {
     if (buffer.capacity() != 16) None
     else Some(new UUID(buffer.getLong(0), buffer.getLong(8)))
   }
-
-  def fromAccountIdentifier(extendedKey: String, coinFamily: CoinFamily, coin: Coin): UUID =
-    UUID.nameUUIDFromBytes((extendedKey + coinFamily.name + coin.name).getBytes)
 
 }

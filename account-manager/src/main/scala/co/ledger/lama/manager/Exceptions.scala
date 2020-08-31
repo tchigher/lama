@@ -1,6 +1,6 @@
 package co.ledger.lama.manager
 
-import co.ledger.lama.manager.models.{AccountIdentifier, Coin, CoinFamily}
+import co.ledger.lama.common.models.{AccountIdentifier, Coin, CoinFamily}
 
 object Exceptions {
 

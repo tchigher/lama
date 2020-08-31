@@ -23,6 +23,8 @@ object config {
 
     def queueName(exchangeName: ExchangeName): QueueName =
       QueueName(s"${exchangeName.value}.${routingKey.value}")
+
+    val maxConcurrent: Int = Runtime.getRuntime.availableProcessors() * 2
   }
 
   object Config {

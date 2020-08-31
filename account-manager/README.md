@@ -1,6 +1,6 @@
 # Lama - Account Manager
 
-![](./excalidraw/account-manager.png)
+![](../excalidraw/account-manager.png)
 
 ## Getting started
 1. Install [sbt][sbt]

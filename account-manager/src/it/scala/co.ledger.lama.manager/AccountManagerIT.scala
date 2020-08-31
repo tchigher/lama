@@ -1,12 +1,12 @@
 package co.ledger.lama.manager
 
 import cats.effect.IO
+import co.ledger.lama.common.models._
+import co.ledger.lama.common.models.SyncEvent.Payload
+import co.ledger.lama.common.utils.{IOAssertion, RabbitUtils}
 import co.ledger.lama.manager.config.CoinConfig
-import co.ledger.lama.manager.models.SyncEvent.{Payload, Status}
-import co.ledger.lama.manager.models._
 import co.ledger.lama.manager.protobuf
 import co.ledger.lama.manager.utils.UuidUtils.bytesToUuid
-import co.ledger.lama.manager.utils.RabbitUtils
 import dev.profunktor.fs2rabbit.interpreter.RabbitClient
 import dev.profunktor.fs2rabbit.model.ExchangeName
 import doobie.implicits._
@@ -57,27 +57,20 @@ class AccountManagerIT extends AnyFlatSpecLike with Matchers with TestResources 
             registeredAccountId = bytesToUuid(registeredResult.accountId).get
             registeredSyncId    = bytesToUuid(registeredResult.syncId).get
 
-            messageSent1 <- worker.consumeMessage()
+            messageSent1 <- worker.consumeWorkableEvent()
 
             // Report a successful sync event with a new cursor.
             syncedCursorJson = Json.obj("blockHeight" -> Json.fromLong(123456789))
-            _ <- worker.reportEvent(
-              messageSent1.copy(
-                status = Status.Synchronized,
-                payload = messageSent1.payload.copy(data = syncedCursorJson)
-              )
+            _ <- worker.publishReportableEvent(
+              messageSent1.reportSuccess(syncedCursorJson)
             )
 
-            messageSent2 <- worker.consumeMessage()
+            messageSent2 <- worker.consumeWorkableEvent()
 
             // Report a failed sync event with an error message.
             syncFailedErrorJson = Json.obj("errorMessage" -> Json.fromString("failed to sync"))
-            _ <- worker.reportEvent(
-              messageSent2.copy(
-                status = Status.SyncFailed,
-                payload =
-                  messageSent2.payload.copy(data = syncedCursorJson.deepMerge(syncFailedErrorJson))
-              )
+            _ <- worker.publishReportableEvent(
+              messageSent2.reportFailure(syncedCursorJson.deepMerge(syncFailedErrorJson))
             )
 
             // Unregister an account.
@@ -87,26 +80,20 @@ class AccountManagerIT extends AnyFlatSpecLike with Matchers with TestResources 
             unregisteredAccountId = bytesToUuid(unregisteredResult.accountId).get
             unregisteredSyncId    = bytesToUuid(unregisteredResult.syncId).get
 
-            messageSent3 <- worker.consumeMessage()
+            messageSent3 <- worker.consumeWorkableEvent()
 
             // Report a failed delete event with an error message.
             deleteFailedErrorJson =
               Json.obj("errorMessage" -> Json.fromString("failed to delete data"))
-            _ <- worker.reportEvent(
-              messageSent3.copy(
-                status = Status.DeleteFailed,
-                payload = messageSent3.payload.copy(data = deleteFailedErrorJson)
-              )
+            _ <- worker.publishReportableEvent(
+              messageSent3.reportFailure(deleteFailedErrorJson)
             )
 
-            messageSent4 <- worker.consumeMessage()
+            messageSent4 <- worker.consumeWorkableEvent()
 
             // Report a successful delete event.
-            _ <- worker.reportEvent(
-              messageSent4.copy(
-                status = Status.Deleted,
-                payload = Payload(accountTest)
-              )
+            _ <- worker.publishReportableEvent(
+              messageSent4.reportSuccess(Json.obj())
             )
 
             // Fetch all sync events.
@@ -119,28 +106,28 @@ class AccountManagerIT extends AnyFlatSpecLike with Matchers with TestResources 
                 .transact(db)
           } yield {
             it should "have consumed messages from worker" in {
-              messageSent1 shouldBe SyncEvent(
+              messageSent1 shouldBe WorkableEvent(
                 accountTest.id,
                 registeredSyncId,
                 Status.Registered,
                 Payload(accountTest)
               )
 
-              messageSent2 shouldBe SyncEvent(
+              messageSent2 shouldBe WorkableEvent(
                 accountTest.id,
                 messageSent2.syncId,
                 Status.Registered,
                 Payload(accountTest, syncedCursorJson)
               )
 
-              messageSent3 shouldBe SyncEvent(
+              messageSent3 shouldBe WorkableEvent(
                 accountTest.id,
                 unregisteredSyncId,
                 Status.Unregistered,
                 Payload(accountTest)
               )
 
-              messageSent4 shouldBe SyncEvent(
+              messageSent4 shouldBe WorkableEvent(
                 accountTest.id,
                 messageSent4.syncId,
                 Status.Unregistered,
@@ -159,19 +146,19 @@ class AccountManagerIT extends AnyFlatSpecLike with Matchers with TestResources 
             it should "have (registered -> published -> synchronized) events for the first iteration" in {
               val eventsBatch1 = syncEvents.slice(0, 3)
               eventsBatch1 shouldBe List(
-                SyncEvent(
+                WorkableEvent(
                   accountTest.id,
                   registeredSyncId,
                   Status.Registered,
                   Payload(accountTest)
                 ),
-                SyncEvent(
+                FlaggedEvent(
                   accountTest.id,
                   registeredSyncId,
                   Status.Published,
                   Payload(accountTest)
                 ),
-                SyncEvent(
+                ReportableEvent(
                   accountTest.id,
                   registeredSyncId,
                   Status.Synchronized,
@@ -183,19 +170,19 @@ class AccountManagerIT extends AnyFlatSpecLike with Matchers with TestResources 
             it should "have (registered -> published -> sync_failed) events for the next iteration" in {
               val eventsBatch2 = syncEvents.slice(3, 6)
               eventsBatch2 shouldBe List(
-                SyncEvent(
+                WorkableEvent(
                   accountTest.id,
                   messageSent2.syncId,
                   Status.Registered,
                   Payload(accountTest, syncedCursorJson)
                 ),
-                SyncEvent(
+                FlaggedEvent(
                   accountTest.id,
                   messageSent2.syncId,
                   Status.Published,
                   Payload(accountTest, syncedCursorJson)
                 ),
-                SyncEvent(
+                ReportableEvent(
                   accountTest.id,
                   messageSent2.syncId,
                   Status.SyncFailed,
@@ -211,19 +198,19 @@ class AccountManagerIT extends AnyFlatSpecLike with Matchers with TestResources 
             it should "have (unregistered -> published -> delete_failed) events for the next iteration" in {
               val eventsBatch3 = syncEvents.slice(6, 9)
               eventsBatch3 shouldBe List(
-                SyncEvent(
+                WorkableEvent(
                   accountTest.id,
                   messageSent3.syncId,
                   Status.Unregistered,
                   Payload(accountTest)
                 ),
-                SyncEvent(
+                FlaggedEvent(
                   accountTest.id,
                   messageSent3.syncId,
                   Status.Published,
                   Payload(accountTest)
                 ),
-                SyncEvent(
+                ReportableEvent(
                   accountTest.id,
                   messageSent3.syncId,
                   Status.DeleteFailed,
@@ -235,19 +222,19 @@ class AccountManagerIT extends AnyFlatSpecLike with Matchers with TestResources 
             it should "have (unregistered -> published -> deleted) events at the end" in {
               val eventsBatch4 = syncEvents.slice(9, 12)
               eventsBatch4 shouldBe List(
-                SyncEvent(
+                WorkableEvent(
                   accountTest.id,
                   messageSent4.syncId,
                   Status.Unregistered,
                   Payload(accountTest, deleteFailedErrorJson)
                 ),
-                SyncEvent(
+                FlaggedEvent(
                   accountTest.id,
                   messageSent4.syncId,
                   Status.Published,
                   Payload(accountTest, deleteFailedErrorJson)
                 ),
-                SyncEvent(
+                ReportableEvent(
                   accountTest.id,
                   messageSent4.syncId,
                   Status.Deleted,
@@ -275,16 +262,16 @@ class SimpleWorker(
     coinConf: CoinConfig
 ) {
 
-  private val consumer: Stream[IO, SyncEvent] =
-    RabbitUtils.createAutoAckConsumer[SyncEvent](rabbit, coinConf.queueName(inExchangeName))
+  private val consumer: Stream[IO, WorkableEvent] =
+    RabbitUtils.createAutoAckConsumer[WorkableEvent](rabbit, coinConf.queueName(inExchangeName))
 
-  private val publisher: Stream[IO, SyncEvent => IO[Unit]] =
-    RabbitUtils.createPublisher[SyncEvent](rabbit, outExchangeName, coinConf.routingKey)
+  private val publisher: Stream[IO, ReportableEvent => IO[Unit]] =
+    RabbitUtils.createPublisher[ReportableEvent](rabbit, outExchangeName, coinConf.routingKey)
 
-  def consumeMessage(): IO[SyncEvent] =
+  def consumeWorkableEvent(): IO[WorkableEvent] =
     consumer.take(1).compile.last.map(_.get)
 
-  def reportEvent(e: SyncEvent): IO[Unit] =
+  def publishReportableEvent(e: ReportableEvent): IO[Unit] =
     publisher.evalMap(p => p(e)).compile.drain
 
 }

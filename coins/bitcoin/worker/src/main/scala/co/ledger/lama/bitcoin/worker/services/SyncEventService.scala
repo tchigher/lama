@@ -1,11 +1,11 @@
 package co.ledger.lama.bitcoin.worker.services
 
 import cats.effect.IO
-import co.ledger.lama.bitcoin.worker.models.{InitialSyncEvent, ReportSyncEvent}
+import co.ledger.lama.common.models.{ReportableEvent, WorkableEvent}
+import co.ledger.lama.common.utils.RabbitUtils
 import dev.profunktor.fs2rabbit.interpreter.RabbitClient
 import dev.profunktor.fs2rabbit.model.{ExchangeName, QueueName, RoutingKey}
 import fs2.Stream
-import io.circe.parser.parse
 
 class SyncEventService(
     rabbitClient: RabbitClient[IO],
@@ -14,27 +14,13 @@ class SyncEventService(
     lamaRoutingKey: RoutingKey
 ) {
 
-  def consumeSyncEvents: Stream[IO, InitialSyncEvent] =
-    Stream
-      .resource(rabbitClient.createConnectionChannel)
-      .evalMap { implicit channel =>
-        rabbitClient.createAutoAckConsumer[String](workerQueueName)
-      }
-      .flatten
-      .evalMap { message =>
-        val parsed = parse(message.payload).flatMap(_.as[InitialSyncEvent])
-        IO.fromEither(parsed)
-      }
+  def consumeWorkableEvents: Stream[IO, WorkableEvent] =
+    RabbitUtils.createAutoAckConsumer[WorkableEvent](rabbitClient, workerQueueName)
 
-  private val publisher: IO[ReportSyncEvent => IO[Unit]] =
-    rabbitClient.createConnectionChannel.use { implicit channel =>
-      rabbitClient.createPublisher[ReportSyncEvent](
-        lamaExchangeName,
-        lamaRoutingKey
-      )
-    }
+  private val publisher: Stream[IO, ReportableEvent => IO[Unit]] =
+    RabbitUtils.createPublisher[ReportableEvent](rabbitClient, lamaExchangeName, lamaRoutingKey)
 
-  def reportEvent(event: ReportSyncEvent): IO[Unit] =
-    publisher.flatMap(p => p(event))
+  def reportEvent(event: ReportableEvent): IO[Unit] =
+    publisher.evalMap(p => p(event)).compile.drain
 
 }

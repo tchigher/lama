@@ -4,22 +4,23 @@ import cats.effect.{ConcurrentEffect, IO, Timer}
 import co.ledger.lama.bitcoin.worker.config.ExplorerConfig
 import co.ledger.lama.bitcoin.worker.models.explorer._
 import io.circe.Decoder
-import org.http4s.Request
+import org.http4s.{Method, Request}
 import org.http4s.client.Client
 import org.http4s.circe.CirceEntityDecoder._
-import org.http4s.Method
 import fs2.{Chunk, Pull, Stream}
 
 class ExplorerService(httpClient: Client[IO], conf: ExplorerConfig) {
 
+  private val btcBasePath = "/blockchain/v3/btc"
+
   def getCurrentBlock: IO[Block] =
-    httpClient.expect[Block](conf.uri.withPath("/blocks/current"))
+    httpClient.expect[Block](conf.uri.withPath(s"$btcBasePath/blocks/current"))
 
   def getBlock(hash: BlockHash): IO[Block] =
-    httpClient.expect[Block](conf.uri.withPath(s"/blocks/$hash"))
+    httpClient.expect[Block](conf.uri.withPath(s"$btcBasePath/blocks/$hash"))
 
   def getBlock(height: BlockHeight): IO[Block] =
-    httpClient.expect[Block](conf.uri.withPath(s"/blocks/$height"))
+    httpClient.expect[Block](conf.uri.withPath(s"$btcBasePath/blocks/$height"))
 
   def getTransactions(
       address: String,
@@ -35,7 +36,7 @@ class ExplorerService(httpClient: Client[IO], conf: ExplorerConfig) {
   private def getTransactionsRequest(address: String, blockHash: Option[BlockHash]) = {
     val baseUri =
       conf.uri
-        .withPath(s"/addresses/$address/transactions")
+        .withPath(s"$btcBasePath/addresses/$address/transactions")
         .withQueryParam("no_token", true)
         .withQueryParam("batch_size", conf.txsBatchSize)
 
@@ -60,7 +61,7 @@ class ExplorerService(httpClient: Client[IO], conf: ExplorerConfig) {
       .eval(client.expect[GetTransactionsResponse](getTransactionsRequest(address, blockHash)))
       .flatMap { res =>
         if (res.truncated) {
-          // The explorer returns batch_size + 1 txs.
+          // The explorer returns batch_size + 1 tx.
           // So, we need to drop the last tx to avoid having duplicate txs.
           val fixedRes      = res.copy(txs = res.txs.dropRight(1))
           val lastBlockHash = res.txs.lastOption.map(_.block.hash)

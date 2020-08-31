@@ -2,12 +2,10 @@ package co.ledger.lama.manager
 
 import cats.effect.{Blocker, ContextShift, IO, Resource, Timer}
 import cats.implicits._
+import co.ledger.lama.common.models.{AccountIdentifier, Coin, CoinFamily}
+import co.ledger.lama.common.utils.RabbitUtils
 import co.ledger.lama.manager.config.Config
-import co.ledger.lama.manager.models.{AccountIdentifier, Coin, CoinFamily}
-import co.ledger.lama.manager.utils.RabbitUtils
 import com.redis.RedisClient
-import dev.profunktor.fs2rabbit.config.deletion
-import dev.profunktor.fs2rabbit.config.deletion.{DeletionExchangeConfig, DeletionQueueConfig}
 import dev.profunktor.fs2rabbit.interpreter.RabbitClient
 import doobie.hikari.HikariTransactor
 import doobie.util.ExecutionContexts
@@ -77,35 +75,25 @@ trait TestResources extends TestSuite with BeforeAndAfterAll {
 
   private def cleanRabbit(): IO[Unit] =
     rabbit.use { client =>
-      val coinConfs          = conf.orchestrator.coins
-      val eventsExchangeName = conf.orchestrator.lamaEventsExchangeName
-      val workerExchangeName = conf.orchestrator.workerEventsExchangeName
+      val coinConfs                = conf.orchestrator.coins
+      val lamaEventsExchangeName   = conf.orchestrator.lamaEventsExchangeName
+      val workerEventsExchangeName = conf.orchestrator.workerEventsExchangeName
 
-      client.createConnectionChannel.use { implicit channel =>
-        val deleteQueues = coinConfs
-          .map { coinConf =>
-            client.deleteQueue(
-              DeletionQueueConfig(
-                coinConf.queueName(eventsExchangeName),
-                deletion.Used,
-                deletion.NonEmpty
-              )
-            ) &>
-              client.deleteQueue(
-                DeletionQueueConfig(
-                  coinConf.queueName(workerExchangeName),
-                  deletion.Used,
-                  deletion.NonEmpty
-                )
-              )
-          }
-          .sequence
-          .void
+      val deleteQueues =
+        coinConfs.map { coinConf =>
+          RabbitUtils.deleteBindings(
+            client,
+            List(
+              coinConf.queueName(workerEventsExchangeName),
+              coinConf.queueName(lamaEventsExchangeName)
+            )
+          )
+        }.sequence
 
-        deleteQueues *>
-          (client.deleteExchange(DeletionExchangeConfig(eventsExchangeName, deletion.Used)) &>
-            client.deleteExchange(DeletionExchangeConfig(workerExchangeName, deletion.Used)))
-      }
+      val deleteExchanges =
+        RabbitUtils.deleteExchanges(client, List(workerEventsExchangeName, lamaEventsExchangeName))
+
+      deleteQueues *> deleteExchanges
     }
 
   override def beforeAll(): Unit = {

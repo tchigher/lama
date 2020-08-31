@@ -1,8 +1,9 @@
 package co.ledger.lama.manager
 
 import cats.effect.IO
+import co.ledger.lama.common.models.WithKey
+import co.ledger.lama.common.utils.RabbitUtils
 import co.ledger.lama.manager.Exceptions.RedisUnexpectedException
-import co.ledger.lama.manager.utils.RabbitUtils
 import com.redis.RedisClient
 import com.redis.serialization.{Format, Parse}
 import com.redis.serialization.Parse.Implicits._
@@ -15,13 +16,11 @@ import io.circe.syntax._
 
 import scala.annotation.nowarn
 
-abstract class WithRedisKey[K](val key: K)
-
 /**
   * Publisher publishing events sequentially.
   * Redis is used as a FIFO queue to guarantee the sequence.
   */
-trait Publisher[K, V <: WithRedisKey[K]] {
+trait Publisher[K, V <: WithKey[K]] {
   import Publisher._
 
   // Max concurrent ongoing events.
@@ -111,7 +110,7 @@ object Publisher {
   def pendingEventsKey[K](key: K): String        = s"pending_events_$key"
 }
 
-class RabbitPublisher[K, V <: WithRedisKey[K]](
+class RabbitPublisher[K, V <: WithKey[K]](
     val redis: RedisClient,
     rabbit: RabbitClient[IO],
     exchangeName: ExchangeName,

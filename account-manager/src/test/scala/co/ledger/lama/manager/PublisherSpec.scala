@@ -2,6 +2,8 @@ package co.ledger.lama.manager
 import java.util.UUID
 
 import cats.effect.IO
+import co.ledger.lama.common.models.WithKey
+import co.ledger.lama.common.utils.IOAssertion
 import com.redis.RedisClient
 import fs2.Stream
 import io.circe.{Decoder, Encoder}
@@ -84,7 +86,9 @@ class PublisherSpec extends AnyFlatSpecLike with Matchers with Inspectors with B
 
 }
 
-case class TestEvent(accountId: UUID, eventId: String) extends WithRedisKey(accountId)
+case class TestEvent(accountId: UUID, eventId: String) extends WithKey[UUID] {
+  val key: UUID = accountId
+}
 
 object TestEvent {
 
@@ -114,6 +118,6 @@ class TestPublisher(
       publishedEvents = publishedEvents ++ Seq(event)
     }
 
-  def countPendingEvents: Option[Long] = redis.llen(pendingEventsKey(key))
+  def countPendingEvents: Option[Long] = redis.llen(pendingEventsKey(key.toString))
 
 }

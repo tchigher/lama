@@ -2,7 +2,7 @@ package co.ledger.lama.manager
 
 import java.util.UUID
 
-import co.ledger.lama.manager.models.{Coin, CoinFamily}
+import co.ledger.lama.common.models.{AccountIdentifier, Coin, CoinFamily}
 import co.ledger.lama.manager.utils.UuidUtils
 import org.scalacheck.Gen
 import org.scalatest.funsuite.AnyFunSuite
@@ -20,7 +20,7 @@ class UuidUtilsSpec extends AnyFunSuite with Matchers {
 
   test("account identifier to uuid") {
     assert(
-      UuidUtils.fromAccountIdentifier("xpub", CoinFamily.Bitcoin, Coin.Btc) ==
+      AccountIdentifier("xpub", CoinFamily.Bitcoin, Coin.Btc).id ==
         UUID.fromString("281f7c1c-f92f-3144-a6b2-514d9a2080e4")
     )
   }
