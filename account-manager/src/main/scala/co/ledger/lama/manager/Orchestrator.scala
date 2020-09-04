@@ -43,7 +43,7 @@ class CoinOrchestrator(
     val db: Transactor[IO],
     val rabbit: RabbitClient[IO],
     val redis: RedisClient
-)(implicit cs: ContextShift[IO])
+)(implicit cs: ContextShift[IO], t: Timer[IO])
     extends Orchestrator {
 
   // Declare rabbitmq exchanges and bindings used by workers and the orchestrator.

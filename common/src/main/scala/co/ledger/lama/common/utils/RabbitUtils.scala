@@ -4,18 +4,19 @@ import java.nio.charset.StandardCharsets
 import java.util.concurrent.Executors
 
 import cats.data.Kleisli
-import cats.effect.{Blocker, ContextShift, IO, Resource}
+import cats.effect.{Blocker, ContextShift, IO, Resource, Timer}
 import cats.implicits._
-import dev.profunktor.fs2rabbit.config.{Fs2RabbitConfig, deletion}
+import co.ledger.lama.common.utils.ResourceUtils.{RetryPolicy, retriableResource}
 import dev.profunktor.fs2rabbit.config.declaration.DeclarationQueueConfig
 import dev.profunktor.fs2rabbit.config.deletion.{DeletionExchangeConfig, DeletionQueueConfig}
+import dev.profunktor.fs2rabbit.config.{Fs2RabbitConfig, deletion}
 import dev.profunktor.fs2rabbit.effects.MessageEncoder
 import dev.profunktor.fs2rabbit.interpreter.RabbitClient
 import dev.profunktor.fs2rabbit.model._
 import fs2.Stream
 import io.circe.parser.parse
-import io.circe.{Decoder, Encoder}
 import io.circe.syntax._
+import io.circe.{Decoder, Encoder}
 
 object RabbitUtils {
 
@@ -25,21 +26,22 @@ object RabbitUtils {
     Resource
       .make(IO(Executors.newCachedThreadPool()))(es => IO(es.shutdown()))
       .map(Blocker.liftExecutorService)
-      .evalMap(RabbitClient[IO](conf, _))
+      .evalMap(blocker => RabbitClient[IO](conf, blocker))
 
   def declareExchanges(
       R: RabbitClient[IO],
       exchanges: List[(ExchangeName, ExchangeType)]
-  ): IO[Unit] =
-    R.createConnectionChannel.use { implicit channel =>
-      exchanges
-        .map {
-          case (exchangeName, exchangeType) =>
-            R.declareExchange(exchangeName, exchangeType)
-        }
-        .sequence
-        .void
-    }
+  )(implicit t: Timer[IO]): IO[Unit] =
+    retriableResource(R.createConnectionChannel, RetryPolicy.exponentialBackOff())
+      .use { implicit channel =>
+        exchanges
+          .map {
+            case (exchangeName, exchangeType) =>
+              R.declareExchange(exchangeName, exchangeType)
+          }
+          .sequence
+          .void
+      }
 
   def declareBindings(
       R: RabbitClient[IO],

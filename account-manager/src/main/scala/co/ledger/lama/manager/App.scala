@@ -1,7 +1,7 @@
 package co.ledger.lama.manager
 
 import cats.effect.{Blocker, ExitCode, IO, IOApp, Resource}
-import co.ledger.lama.common.utils.RabbitUtils
+import co.ledger.lama.common.utils.{RabbitUtils, ResourceUtils}
 import co.ledger.lama.manager.config.Config
 import com.redis.RedisClient
 import doobie.hikari.HikariTransactor
@@ -20,21 +20,20 @@ object App extends IOApp {
       // our transaction EC
       te <- ExecutionContexts.cachedThreadPool[IO]
 
-      db <- HikariTransactor.newHikariTransactor[IO](
+      db <- ResourceUtils.retriableResource(HikariTransactor.newHikariTransactor[IO](
         conf.postgres.driver,            // driver classname
         conf.postgres.url,               // connect URL
         conf.postgres.user,              // username
         conf.postgres.password,          // password
         ce,                              // await connection here
         Blocker.liftExecutionContext(te) // execute JDBC operations here
-      )
+      ))
 
       // rabbitmq client
       rabbitClient <- RabbitUtils.createClient(conf.rabbit)
-
       // redis client
       redisClient <-
-        Resource.fromAutoCloseable(IO(new RedisClient(conf.redis.host, conf.redis.port)))
+        ResourceUtils.retriableResource(Resource.fromAutoCloseable(IO(new RedisClient(conf.redis.host, conf.redis.port))))
 
       // create the orchestrator
       orchestrator = new CoinOrchestrator(
