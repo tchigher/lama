@@ -14,24 +14,14 @@ aliases:
       only: /.*/
   - &restore_docker_cache
     keys:
-      - lama-docker-{{ .Branch }}-{{ checksum "build.sbt" }}
-      - lama-docker-{{ .Branch }}
-      - lama-docker
+      - lama-cache-docker-{{ .Branch }}-{{ checksum "build.sbt" }}
+      - lama-cache-docker-{{ .Branch }}
+      - lama-cache-docker
   - &save_docker_cache
-    key: lama-docker-{{ .Branch }}-{{ checksum "build.sbt" }}
+    key: lama-cache-docker-{{ .Branch }}-{{ checksum "build.sbt" }}
     paths:
-      - .ivy2
-      - .sbt
-  - &restore_machine_cache
-    keys:
-      - lama-machine-{{ .Branch }}-{{ checksum "build.sbt" }}
-      - lama-machine-{{ .Branch }}
-      - lama-machine
-  - &save_machine_cache
-    key: lama-machine-{{ .Branch }}-{{ checksum "build.sbt" }}
-    paths:
-      - .ivy2
-      - .sbt
+      - ~/.ivy2
+      - ~/.sbt
 
 parameters:
   sbt:
@@ -41,7 +31,7 @@ parameters:
 jobs:
   build:
     docker:
-      - image: ledgerhq/sbt-openjdk-8
+      - image: circleci/openjdk:14.0.2-jdk-buster
         environment:
           JVM_OPTS: -Xmx3200m
           TERM: dumb
@@ -58,7 +48,7 @@ jobs:
 
   scala_linter:
     docker:
-      - image: ledgerhq/sbt-openjdk-8
+      - image: circleci/openjdk:14.0.2-jdk-buster
         auth:
           username: $DOCKER_USERNAME
           password: $DOCKER_PASSWORD
@@ -71,13 +61,10 @@ jobs:
 
   unit_tests:
     docker:
-      - image: ledgerhq/sbt-openjdk-8
+      - image: circleci/openjdk:14.0.2-jdk-buster
         environment:
           JVM_OPTS: -Xmx3200m
           TERM: dumb
-        auth:
-          username: $DOCKER_USERNAME
-          password: $DOCKER_PASSWORD
     steps:
       - checkout
       - restore_cache: *restore_docker_cache
@@ -85,23 +72,23 @@ jobs:
           name: Run Account Manager unit tests
           command: << pipeline.parameters.sbt >> accountManager/test
       - run:
-          name: Run Account Manager unit tests
+          name: Run Bitcoin Service unit tests
           command: << pipeline.parameters.sbt >> btcService/test
       - run:
-          name: Run Account Manager unit tests
+          name: Run Bitcoin Worker unit tests
           command: << pipeline.parameters.sbt >> btcWorker/test
-
-  generate_docker_images:
-    machine:
-      image: circleci/classic:latest
-
+  package:
+    docker:
+      - image: circleci/openjdk:14.0.2-jdk-buster
+        environment:
+          JVM_OPTS: -Xmx3200m
+          TERM: dumb
     steps:
       - checkout
-      - restore_cache: *restore_machine_cache
+      - restore_cache: *restore_docker_cache
       - run:
-          name: Generate docker images froml sbt docker plugin
-          command: << pipeline.parameters.sbt >> docker
-      - save_cache: *save_docker_cache
+          name: Package Jar
+          command: << pipeline.parameters.sbt >> assembly
 
 workflows:
   version: 2.1
@@ -111,19 +98,19 @@ workflows:
       - unit_tests:
           requires:
             - build
-      - generate_docker_images:
+      - package:
           requires:
             - build
       - docker/build_image:
+          context: githubpkg
+          docker_build_target: account-manager
           requires:
-           - generate_docker_images
+            - package
           after_checkout:
             - run:
-                name: Generate docker images froml sbt docker plugin
-                command: << pipeline.parameters.sbt >> docker
-          docker_build_target: account-manager/target/docker
-          docker_project_name: lama-account-manager
+                name: Assembly
+                command: << pipeline.parameters.sbt >> assembly
       - docker/publish_image:
           context: githubpkg
           requires:
-            - generate_docker_images
+            - docker/build_image

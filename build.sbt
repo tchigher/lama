@@ -1,24 +1,25 @@
 import sbt.Keys.libraryDependencies
+
 // Build shared info
-ThisBuild / organization := "co.ledger"
-ThisBuild / version := "0.1.0-SNAPSHOT"
-ThisBuild / scalaVersion := "2.13.3"
-ThisBuild / resolvers += Resolver.sonatypeRepo("releases")
-ThisBuild / scalacOptions ++= CompilerFlags.all
-ThisBuild / buildInfoKeys := Seq[BuildInfoKey](
+organization := "co.ledger"
+version := "0.1.0-SNAPSHOT"
+scalaVersion := "2.13.3"
+resolvers += Resolver.sonatypeRepo("releases")
+scalacOptions ++= CompilerFlags.all
+buildInfoPackage := "buildinfo"
+buildInfoKeys := Seq[BuildInfoKey](
   name,
   version,
   scalaVersion,
   sbtVersion,
   git.gitHeadCommit
 )
-ThisBuild / buildInfoPackage := "buildinfo"
-ThisBuild / libraryDependencies += compilerPlugin("org.typelevel" %% "kind-projector" % "0.10.3")
 
+// Shared Plugins
 enablePlugins(BuildInfoPlugin)
+libraryDependencies += compilerPlugin("org.typelevel" %% "kind-projector" % "0.10.3")
 
-lazy val assemblyFolder = file("assembly")
-lazy val ignoreFiles    = List("application.conf.sample")
+lazy val ignoreFiles = List("application.conf.sample")
 
 // Runtime
 scalaVersion := "2.13.3"
@@ -27,9 +28,11 @@ resolvers += Resolver.sonatypeRepo("releases")
 addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.10.3")
 
 lazy val assemblySettings = Seq(
-  cleanFiles += assemblyFolder,
   test in assembly := {},
-  assemblyOutputPath in assembly := assemblyFolder / (name.value + "-" + version.value + ".jar"),
+  assemblyOutputPath in assembly := file(
+    target.value.getAbsolutePath
+  ) / "assembly" / (name.value + "-" + version.value + ".jar"),
+  cleanFiles += file(target.value.getAbsolutePath) / "assembly",
   // Remove resources files from the JAR (they will be copied to an external folder)
   assemblyMergeStrategy in assembly := {
     case PathList("META-INF", _) => MergeStrategy.discard
@@ -56,11 +59,11 @@ lazy val dockerSettings = Seq(
   // User `docker` to build docker image
   dockerfile in docker := {
     // The assembly task generates a fat JAR file
-    val artifact: File     = assembly.value
-    val artifactTargetPath = s"/app/${artifact.name}"
+    val artifact: File     = (assemblyOutputPath in assembly).value
+    val artifactTargetPath = s"/app/${(assemblyOutputPath in assembly).value.name}"
     new Dockerfile {
       from("openjdk:14.0.2")
-      add(artifact, artifactTargetPath)
+      copy(artifact, artifactTargetPath)
       entryPoint("java", "-jar", artifactTargetPath)
     }
   }
@@ -72,18 +75,17 @@ lazy val sharedSettings = assemblySettings ++ dockerSettings ++ Defaults.itSetti
 lazy val common = (project in file("common"))
   .settings(
     name := "lama-common",
-    sharedSettings,
-    libraryDependencies ++= Dependencies.lama_common
+    libraryDependencies ++= Dependencies.lamaCommon
   )
 
 lazy val accountManager = (project in file("account-manager"))
-  .enablePlugins(Fs2Grpc, FlywayPlugin, DockerPlugin)
+  .enablePlugins(Fs2Grpc, FlywayPlugin, sbtdocker.DockerPlugin)
   .configs(IntegrationTest)
   .settings(
     name := "lama-account-manager",
     sharedSettings,
     // Dependencies
-    libraryDependencies ++= Dependencies.account_manager,
+    libraryDependencies ++= Dependencies.accountManager,
     libraryDependencies ++= Dependencies.test,
     // Proto config
     scalapbCodeGeneratorOptions += CodeGeneratorOption.FlatPackage,
@@ -96,7 +98,7 @@ lazy val accountManager = (project in file("account-manager"))
   .dependsOn(common)
 
 lazy val bitcoinInterpreter = (project in file("coins/bitcoin/interpreter"))
-  .enablePlugins(DockerPlugin)
+  .enablePlugins(sbtdocker.DockerPlugin)
   .configs(IntegrationTest)
   .settings(
     name := "lama-bitcoin-interpreter",
@@ -105,16 +107,16 @@ lazy val bitcoinInterpreter = (project in file("coins/bitcoin/interpreter"))
   .dependsOn(common)
 
 lazy val btcService = (project in file("coins/bitcoin/service"))
-  .enablePlugins(Fs2Grpc, DockerPlugin)
+  .enablePlugins(Fs2Grpc, sbtdocker.DockerPlugin)
   .settings(
     name := "lama-bitcoin-service",
-    libraryDependencies ++= Dependencies.bitcoin_service,
+    libraryDependencies ++= Dependencies.bitcoinService,
     sharedSettings
   )
   .dependsOn(common)
 
 lazy val btcWorker = (project in file("coins/bitcoin/worker"))
-  .enablePlugins(DockerPlugin)
+  .enablePlugins(sbtdocker.DockerPlugin)
   .configs(IntegrationTest)
   .settings(
     name := "lama-bitcoin-worker",
