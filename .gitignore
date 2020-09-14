@@ -4,6 +4,7 @@
 .sbt
 .DS_Store
 
+*.iml
 assembly
 target
 project/project

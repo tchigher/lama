@@ -60,7 +60,7 @@ class CoinOrchestrator(
       (eventsExchangeName, coinConf.routingKey, coinConf.queueName(eventsExchangeName)),
       (workerExchangeName, coinConf.routingKey, coinConf.queueName(workerExchangeName))
     )
-    println("hehehe")
+
     RabbitUtils.declareExchanges(rabbit, exchanges) *>
       RabbitUtils.declareBindings(rabbit, bindings)
   }
