@@ -1,13 +1,13 @@
 import sbt.Keys.libraryDependencies
 
 // Build shared info
-organization := "co.ledger"
-version := "0.1.0-SNAPSHOT"
-scalaVersion := "2.13.3"
-resolvers += Resolver.sonatypeRepo("releases")
-scalacOptions ++= CompilerFlags.all
-buildInfoPackage := "buildinfo"
-buildInfoKeys := Seq[BuildInfoKey](
+ThisBuild / organization := "co.ledger"
+ThisBuild / version := "0.1.0-SNAPSHOT"
+ThisBuild / scalaVersion := "2.13.3"
+ThisBuild / resolvers += Resolver.sonatypeRepo("releases")
+ThisBuild / scalacOptions ++= CompilerFlags.all
+ThisBuild / buildInfoPackage := "buildinfo"
+ThisBuild / buildInfoKeys := Seq[BuildInfoKey](
   name,
   version,
   scalaVersion,
@@ -17,7 +17,7 @@ buildInfoKeys := Seq[BuildInfoKey](
 
 // Shared Plugins
 enablePlugins(BuildInfoPlugin)
-libraryDependencies += compilerPlugin("org.typelevel" %% "kind-projector" % "0.10.3")
+ThisBuild / libraryDependencies += compilerPlugin("org.typelevel" %% "kind-projector" % "0.10.3")
 
 lazy val ignoreFiles = List("application.conf.sample")
 

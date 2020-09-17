@@ -7,7 +7,7 @@ version: 2.1
 orbs:
   docker: ledger/docker@volatile
   codecov: codecov/codecov@1.0.2
-  
+
 aliases:
   - &filter_all_tags
     tags:
@@ -29,7 +29,7 @@ parameters:
     default: SBT_OPTS="-Xss512m" sbt -Dsbt.ivy.home=.ivy2 -sbt-dir .sbt
 
 jobs:
-  build:
+  compile:
     docker:
       - image: circleci/openjdk:14.0.2-jdk-buster
         environment:
@@ -94,18 +94,19 @@ workflows:
   version: 2.1
   build_and_test:
     jobs:
-      - build
+      - compile
       - unit_tests:
           requires:
-            - build
-      - package:
-          requires:
-            - build
+            - compile
+# FIXME: enable linter compliance
+#     - scala_linter:
+#          requires:
+#            - compile
       - docker/build_image:
           context: githubpkg
           docker_build_target: account-manager
           requires:
-            - package
+            - compile
           after_checkout:
             - run:
                 name: Assembly
@@ -114,3 +115,5 @@ workflows:
           context: githubpkg
           requires:
             - docker/build_image
+            - unit_tests
+# FIXME:    - scala_linter
