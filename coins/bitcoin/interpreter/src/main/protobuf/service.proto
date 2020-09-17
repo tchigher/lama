@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package pb.v1;
+option java_package = "co.ledger.lama.bitcoin.interpreter.protobuf";
+
+service BitcoinInterpreterService {
+    rpc saveTransactions(Foo) returns (Foo) {}
+    rpc deleteTransactions(Foo) returns (Foo) {}
+    rpc getTransactions(Foo) returns (Foo) {}
+}
+
+message Foo {
+    uint64 bar = 1;
+}

@@ -97,12 +97,29 @@ lazy val accountManager = (project in file("account-manager"))
   )
   .dependsOn(common)
 
-lazy val bitcoinInterpreter = (project in file("coins/bitcoin/interpreter"))
+lazy val btcWorker = (project in file("coins/bitcoin/worker"))
   .enablePlugins(sbtdocker.DockerPlugin)
   .configs(IntegrationTest)
   .settings(
+    name := "lama-bitcoin-worker",
+    sharedSettings,
+    libraryDependencies ++= (Dependencies.http4s ++ Dependencies.test)
+  )
+  .dependsOn(common)
+
+lazy val btcInterpreter = (project in file("coins/bitcoin/interpreter"))
+  .enablePlugins(Fs2Grpc, FlywayPlugin, sbtdocker.DockerPlugin)
+  .configs(IntegrationTest)
+  .settings(
     name := "lama-bitcoin-interpreter",
-    sharedSettings
+    sharedSettings,
+    // Proto config
+    scalapbCodeGeneratorOptions += CodeGeneratorOption.FlatPackage,
+    // Flyway credentials to migrate sql scripts
+    flywayLocations += "db",
+    flywayUrl := "jdbc:postgresql://localhost:5432/lama-btc-interpreter",
+    flywayUser := "lama",
+    flywayPassword := "serge"
   )
   .dependsOn(common)
 
@@ -112,15 +129,5 @@ lazy val btcService = (project in file("coins/bitcoin/service"))
     name := "lama-bitcoin-service",
     libraryDependencies ++= Dependencies.bitcoinService,
     sharedSettings
-  )
-  .dependsOn(common)
-
-lazy val btcWorker = (project in file("coins/bitcoin/worker"))
-  .enablePlugins(sbtdocker.DockerPlugin)
-  .configs(IntegrationTest)
-  .settings(
-    name := "lama-bitcoin-worker",
-    sharedSettings,
-    libraryDependencies ++= (Dependencies.http4s ++ Dependencies.test)
   )
   .dependsOn(common)

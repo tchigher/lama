@@ -4,25 +4,39 @@
 
 ## Getting started
 1. Install [sbt][sbt]
-2. Clone the repo
-3. Install [PostgreSQL][postgresql] and configure access for user `lama` and password `serge` (default user and password from `src/main/resources/application.conf`)
-4. Create database `lama` and give access to the configured user
-5. Apply migration (see [Database migration][database-migration])
-6. Install [RabbitMQ][rabbitmq] and configure access for user `lama` and password `serge` (default user and password from `src/main/resources/application.conf`)
-7. Install [Redis][redis] with the default configuration
-8. Launch the app: `sbt run`
+2. Install [PostgreSQL][postgresql] and configure access for user `lama` and password `serge` (default user and password from `src/main/resources/application.conf`)
+3. Create database `lama` and give access to the configured user
+4. Apply migration (see [Database migration][database-migration])
+5. Install [RabbitMQ][rabbitmq] and configure access for user `lama` and password `serge` (default user and password from `src/main/resources/application.conf`)
+6. Install [Redis][redis] with the default configuration
 
-## Database migration
+## Run the account manager
+
+> A shared `build.sbt` file is used at the root of the project to share common libraries and handle multiple sub projects.
+>
+>All following sbt commands should be done at the root path of the lama project.
+
+Run the app: `sbt accountManager/run`
+
+### Database migration
 
 The project uses [flywayt-sbt][flywayt-sbt] to migrate sql scripts in the folder `src/main/resources/db/migration`.
 
-Migrate your database using `sbt flywayMigrate` or clean it using `sbt flywayClean.
+Migrate your database using `sbt accountManager/flywayMigrate` or clean it using `sbt accountManager/flywayClean`.
 
-## Testing
+### Testing
 
-Unit tests: `sbt test`
+#### Unit tests
+`sbt accountManager/test`
 
-Integration tests: `sbt it:test`
+#### Integration tests
+- Create the `test-lama` database
+
+`psql -h localhost -p 15432 -U lama -c "CREATE DATABASE test-lama"`
+
+- Run tests
+
+`sbt accountManager/it:test`
 
 ## Docker
 
@@ -30,26 +44,21 @@ The plugin [sbt-docker][sbt-docker] is used to build, run and publish the docker
 
 The plugin provides these useful commands:
 
-- `sbt docker`:
+- `sbt accountManager/docker`:
 Builds an image.
 
-- `sbt docker:stage`:
+- `sbt accountManager/docker:stage`:
 Generates a directory with the Dockerfile and environment prepared for creating a Docker image.
 
-- `sbt docker:publishLocal`:
+- `sbt accountManager/docker:publishLocal`:
 Builds an image using the local Docker server.
 
-- `sbt docker:publish`
+- `sbt accountManager/docker:publish`
 Builds an image using the local Docker server, and pushes it to the configured remote repository.
 
-- `sbt docker:clean`
+- `sbt accountManager/docker:clean`
 Removes the built image from the local Docker server.
 
-### Run dockerized lama account manager
-Please have a look on `docker-compose.yml` file for more details on configuration.
-This will create a PostgreSql, a RabbitMQ and the latest published image of the lama account manager.
-
-`docker-compose up`
 
 [sbt]: http://www.scala-sbt.org/1.x/docs/Setup.html
 [postgresql]: https://www.postgresql.org/download/
