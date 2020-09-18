@@ -12,7 +12,7 @@
 
 ## Run the account manager
 
-> A shared `build.sbt` file is used at the root of the project to share common libraries and handle multiple sub projects.
+> A shared `build.sbt` file is used at the root of the lama project to share common libraries and handle multiple sub projects.
 >
 >All following sbt commands should be done at the root path of the lama project.
 

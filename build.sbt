@@ -85,8 +85,7 @@ lazy val accountManager = (project in file("account-manager"))
     name := "lama-account-manager",
     sharedSettings,
     // Dependencies
-    libraryDependencies ++= Dependencies.accountManager,
-    libraryDependencies ++= Dependencies.test,
+    libraryDependencies ++= (Dependencies.accountManager ++ Dependencies.test),
     // Proto config
     scalapbCodeGeneratorOptions += CodeGeneratorOption.FlatPackage,
     // Flyway credentials to migrate sql scripts
@@ -103,7 +102,7 @@ lazy val btcWorker = (project in file("coins/bitcoin/worker"))
   .settings(
     name := "lama-bitcoin-worker",
     sharedSettings,
-    libraryDependencies ++= (Dependencies.http4s ++ Dependencies.test)
+    libraryDependencies ++= (Dependencies.btcWorker ++ Dependencies.test)
   )
   .dependsOn(common)
 
@@ -113,6 +112,7 @@ lazy val btcInterpreter = (project in file("coins/bitcoin/interpreter"))
   .settings(
     name := "lama-bitcoin-interpreter",
     sharedSettings,
+    libraryDependencies ++= (Dependencies.btcInterpreter ++ Dependencies.test),
     // Proto config
     scalapbCodeGeneratorOptions += CodeGeneratorOption.FlatPackage,
     // Flyway credentials to migrate sql scripts
@@ -127,7 +127,7 @@ lazy val btcService = (project in file("coins/bitcoin/service"))
   .enablePlugins(Fs2Grpc, sbtdocker.DockerPlugin)
   .settings(
     name := "lama-bitcoin-service",
-    libraryDependencies ++= Dependencies.bitcoinService,
+    libraryDependencies ++= Dependencies.btcService,
     sharedSettings
   )
   .dependsOn(common)

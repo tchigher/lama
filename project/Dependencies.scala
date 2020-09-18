@@ -66,8 +66,10 @@ object Dependencies extends DependencyBuilders with LibraryManagementSyntax {
     "it.ozimov"                % "embedded-redis"   % embeddedRedisVersion % Test
   )
 
-  val lamaCommon: Seq[ModuleID]     = circe ++ postgres ++ rabbit ++ utilities
-  val accountManager: Seq[ModuleID] = circe ++ postgres ++ rabbit ++ redis ++ utilities
-  val bitcoinService: Seq[ModuleID] = http4s ++ circe ++ postgres ++ utilities
+  val lamaCommon: Seq[ModuleID]     = circe ++ rabbit ++ utilities
+  val accountManager: Seq[ModuleID] = lamaCommon ++ postgres ++ redis
+  val btcWorker: Seq[ModuleID]      = lamaCommon ++ http4s
+  val btcInterpreter: Seq[ModuleID] = lamaCommon ++ postgres
+  val btcService: Seq[ModuleID]     = lamaCommon ++ http4s ++ postgres
 
 }
